@@ -7,6 +7,10 @@ class Resource(object):
         self.id = self._data["id"]
         self.sections = []
 
+        self.free = True
+        self.last_exit_time = None
+        self.currently_used_by = None
+
     def get_id(self):
         return self.id
 
@@ -26,4 +30,24 @@ class Resource(object):
         return self._data["following_allowed"]
 
     def __str__(self):
-        return "%s (%i s)" %(self.get_id(), self.get_release_time())
+        return "%s (%i s)" % (self.get_id(), self.get_release_time())
+
+    def is_free_for(self, train):
+        if self.free:
+            return True
+
+        elif self.currently_used_by is None:
+            return False
+
+        elif train == self.currently_used_by:
+            return True
+
+        return False
+
+    def block(self, train):
+        self.free = False
+        self.currently_used_by = train
+
+    def release(self, release_time):
+        if self.currently_used_by is None and release_time >= self.last_exit_time:
+            self.free = True

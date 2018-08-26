@@ -9,6 +9,7 @@ class Train(object):
         self._data = data
         self.network = Network()
         self.solution = Solution(train=self)
+        self.requirements = None
 
     def get_id(self):
         return self._data["id"]
@@ -16,24 +17,43 @@ class Train(object):
     def get_sections(self):
         return list(self.network.sections.values())
 
+    def get_next_sections(self):
+        if len(self.solution.sections) == 0:
+            node = self.get_first_node()
+        else:
+            node = self.solution.sections[-1].end_node
+        return list(node.out_links)
+
+    def blocked_by(self):
+        sections = self.get_next_sections()
+        ids = list(set([r.currently_used_by.get_id() for s in sections for r in s.get_resources() if r.currently_used_by is not None]))
+        if self.get_id() in ids:
+            ids.remove(self.get_id())
+        return ids
+
     def get_next_free_sections(self, node):
-        n = len([s for s in node.out_links if s.is_free])
-        n2 = len([s for s in node.out_links])
-        print("%s %i/%i" % (self, n, n2))
-        return [s for s in node.out_links if s.is_free]
+        free_sections = [s for s in node.out_links if s.is_free()]
+        return free_sections
 
     def get_requirements(self):
         """
         sorted list of requirements
         :return:
         """
-        return sorted([Requirement.factory(data=d, train=self) for d in self._data["section_requirements"]],
-                      key=lambda x: x.get_sequence_number())
+
+        if self.requirements is None:
+            self.requirements = sorted(
+                [Requirement.factory(data=d, train=self) for d in self._data["section_requirements"]],
+                key=lambda x: x.get_sequence_number())
+        return self.requirements
 
     def get_start_event(self):
         requirement = self.get_requirements()[0]
-        return EnterNodeEvent(train=self, node=self.network.get_first_node(), time=requirement.get_entry_earliest(),
+        return EnterNodeEvent(train=self, node=self.get_first_node(), time=requirement.get_entry_earliest(),
                               previous_section=None)
+
+    def get_first_node(self):
+        return self.network.get_first_node()
 
     def __str__(self):
         return "Train %s" % self.get_id()

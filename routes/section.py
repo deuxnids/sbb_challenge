@@ -7,14 +7,24 @@ class Section(object):
         self._data = data
         self.path = path
         self.train = path._route.train
+        self.entry_time = 9999999
+        self.exit_time = 9999999
         self.start_node = None
         self.end_node = None
-        self.is_free = True
-        self.busy_till = 0.0
         self.occupations = [Occupation(data=d, section=self) for d in self._data["resource_occupations"]]
+        self.marker = None
+        if "section_marker" in self._data:
+            markers = self._data["section_marker"]
+            if len(markers) > 0:
+                self.marker = markers[0]
+
+        self.requirement = None
+        requirements = [r for r in self.train.get_requirements() if r.get_section_marker() == self.get_marker()]
+        if len(requirements) > 0:
+            self.requirement = requirements[0]
 
     def __repr__(self):
-        return "Section(%s) %s" % (self.get_id(), self.get_marker())
+        return "Section(id=%s)" % (self.get_id())
 
     def get_id(self):
         return "%s#%s" % (self.path._route.get_id(), self.get_number())
@@ -56,14 +66,17 @@ class Section(object):
     def get_occupations(self):
         return self.occupations
 
+    def get_resources(self):
+        resources = []
+        for o in self.get_occupations():
+            resources.append(o.resource)
+        return resources
+
     def get_marker(self):
         """labels that mark this route_section as a potential section to fulfil a section_requirement that has any of these as section_marker.
         Note: In all our problem instances, each route_section has at most one section_marker, i.e. the list has length at most one.
         """
-        if "section_marker" in self._data:
-            markers = self._data["section_marker"]
-            if len(markers) > 0:
-                return markers[0]
+        return self.marker
 
     def get_requirement(self):
         """
@@ -71,8 +84,10 @@ class Section(object):
         :param train:
         :return:
         """
-        requirements = [r for r in self.train.get_requirements() if r.get_section_marker() == self.get_marker()]
-        if len(requirements) == 0:
-            return None
+        return self.requirement
 
-        return requirements[0]
+    def is_free(self):
+        for r in self.get_resources():
+            if not r.is_free_for(train=self.train):
+                return False
+        return True

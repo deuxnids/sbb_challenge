@@ -2,6 +2,7 @@ from trains.requirement import Requirement
 from network.network import Network
 from simulator.event import EnterNodeEvent
 from trains.solution import Solution
+import copy
 
 
 class Train(object):
@@ -60,3 +61,21 @@ class Train(object):
 
     def __eq__(self, other):
         return self.get_id() == other.get_id()
+
+    def compute_routes(self):
+
+        def explore_node(node, links, routes):
+            for link in node.out_links:
+                _links = copy.copy(links)
+                _links.append(link)
+                if link.end_node.label == "end":
+                    routes.append(links)
+                else:
+                    node = link.end_node
+                    explore_node(node, _links, routes)
+
+        routes = []
+
+        start_node = self.get_first_node()
+        explore_node(start_node, [], routes)
+        return routes

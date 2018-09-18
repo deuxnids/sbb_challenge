@@ -1,5 +1,5 @@
 import logging
-
+import copy
 from network.node import Node
 
 
@@ -17,7 +17,7 @@ class Network(object):
         marker = section.get_route_alternative_marker_at_entry()
         if marker is not None:
             return str(marker)
-        elif (previous_section is not None):
+        elif previous_section is not None:
             return str(previous_section.get_number()) + "->" + str(section.get_number())
         else:
             return "start"
@@ -66,4 +66,5 @@ class Network(object):
                 start_node.out_links.add(section)
 
                 self.sections[section.get_number()] = section
+
 

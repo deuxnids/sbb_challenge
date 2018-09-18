@@ -8,23 +8,7 @@ from simulator.event import LeaveStationEvent
 from simulator.event import ReleaseResourceEvent
 from trains.requirement import HaltRequirement
 from simulator.event import humanize_time
-import queue
-
-
-class IterableQueue():
-    def __init__(self, source_queue):
-        self.source_queue = source_queue
-
-    def __iter__(self):
-        while True:
-            try:
-                yield self.source_queue.get_nowait()
-            except queue.Empty:
-                return
-
-
-class NeedAction(Exception):
-    pass
+from collections import defaultdict
 
 
 class Simulator(object):
@@ -35,12 +19,7 @@ class Simulator(object):
         self.dispachter = Dispatcher(sim=self)
 
         self.waiting = set()
-        self.events = queue.PriorityQueue()
-        self.max_time = 10 * 60 * 60
-        self.next_minute = None
-        self.current_time = 0
-
-        self._action = None
+        self.events = defaultdict(list)
 
     def create_output(self):
         output = {
@@ -79,7 +58,7 @@ class Simulator(object):
                     occupation.resource.sections.append(section)
 
     def initialize(self):
-        self.events = queue.PriorityQueue()
+        self.events = defaultdict(list)
         self.assign_sections_to_resources()
         for train in self.trains:
             event = train.get_start_event()
@@ -93,30 +72,17 @@ class Simulator(object):
 
     def run_next(self, event):
 
-        if event.time > self.max_time:
-            raise Exception("Too much time")
-
-        if self.next_minute is None or self.current_time is None:
-            self.next_minute = event.time
-            self.current_time = event.time
-
-        if self.next_minute < event.time:
-            logging.info(
-                "%s: Trains waiting=%s Score=%s" % (humanize_time(event.time), len(self.waiting), self.compute_score()))
-            self.next_minute += 60 * 10
-
         if isinstance(event, EnterNodeEvent):
             # Depending on which a section can be picked
             # This is where the dispatcher is used
             # Waiting or LeavingNode
-            self.take_action(event=event)
+            self.on_node(event=event)
 
-        if isinstance(event, LeaveNodeEvent):
-            # = enterSection
-            self.release_previous_section(event=event)
+        elif isinstance(event, LeaveNodeEvent):
+            self.register_release_event(event=event)
 
         elif isinstance(event, ReleaseResourceEvent):
-            self.free_sections(resource=event.resource, emited_at=event.emited_at)
+            self.release_resources(resource=event.resource, emited_at=event.emited_at)
 
         elif isinstance(event, EnterStationEvent):
             train = event.train
@@ -124,37 +90,39 @@ class Simulator(object):
             duration = section.get_requirement().get_min_stopping_time()
             earliest_exit = section.get_requirement().get_exit_earliest()
             time = max(earliest_exit, event.time + duration)
-            next_event = LeaveStationEvent(time=time, train=train, section=section)
+            next_event = LeaveStationEvent(time=time + 1, train=train, section=section)
             self.register_event(next_event)
 
         elif isinstance(event, LeaveStationEvent):
             train = event.train
             section = event.section
-            next_event = EnterNodeEvent(time=event.time, train=train, node=section.end_node,
+            next_event = EnterNodeEvent(time=event.time + 1, train=train, node=section.end_node,
                                         previous_section=section)
             self.register_event(next_event)
 
     def run(self):
-        for event in IterableQueue(self.events):
-            if isinstance(event, EnterNodeEvent) and self._action is None:
-                self.register_event(event)
-                break
-            else:
+        i = 6 * 60 * 60
+        while i < 10 * 60 * 60:
+            i += 1
+            for event in self.events[i]:
+                print(event)
                 self.run_next(event=event)
 
         print("Done %s" % self.compute_score())
 
-    def take_action(self, event):
+    def on_node(self, event):
         train = event.train
 
+        # We are at the end of the journey
         if len(event.node.out_links) == 0:
-            next_event = LeaveNodeEvent(time=event.time, node=event.node, train=train,
+            next_event = LeaveNodeEvent(time=event.time + 1, node=event.node, train=train,
                                         previous_section=event.previous_section, next_section=None)
             self.register_event(next_event)
             train.solution.leave_section(exit_time=event.time)
             logging.info("%s done" % train)
             return
 
+        # We still have a few section to visit
         else:
             sections = event.train.get_next_free_sections(node=event.node)
             if len(sections) == 0:
@@ -167,6 +135,7 @@ class Simulator(object):
 
                     if train.get_id() in blocking_train.blocked_by():
                         raise Exception("mutual blocking %s<->%s" % (train, blocking_train))
+
                 self.waiting.add(train.get_id())
                 next_event = EnterNodeEvent(train=train, time=event.time + 30, previous_section=event.previous_section,
                                             node=event.node)
@@ -180,7 +149,7 @@ class Simulator(object):
 
                 train.solution.enter_section(section, entry_time=event.time)
                 # print("b", section, [str(r) for r in section.get_resources()])
-                self.block_sections(train=train, section=section)
+                self.block_resources(train=train, section=section)
 
                 next_event = LeaveNodeEvent(time=event.time, node=event.node, train=train,
                                             previous_section=event.previous_section, next_section=section)
@@ -190,7 +159,7 @@ class Simulator(object):
                 self.register_event(next_event)
                 return
 
-    def release_previous_section(self, event):
+    def register_release_event(self, event):
         train = event.train
         section = event.previous_section
         next_section = event.next_section
@@ -200,9 +169,7 @@ class Simulator(object):
 
         # logging.info(humanize_time(event.time) + " releasing %s % s" % (section, train))
         if section is not None:
-            for occupation in section.get_occupations():
-                resource = occupation.get_resource()
-
+            for resource in section.get_resources():
                 if resource in next_resources:
                     continue
                 # print(humanize_time(event.time), "Emiting release", train, resource)
@@ -225,16 +192,15 @@ class Simulator(object):
 
         return EnterNodeEvent(time=next_time, train=train, node=section.end_node, previous_section=section)
 
-    def block_sections(self, train, section):
-        for occupation in section.get_occupations():
-            resource = occupation.resource
+    def block_resources(self, train, section):
+        for resource in section.get_resources():
             resource.block(train=train)
 
-    def free_sections(self, resource, emited_at):
+    def release_resources(self, resource, emited_at):
         resource.release(release_time=emited_at)
 
     def register_event(self, event):
-        self.events.put_nowait(event)
+        self.events[event.time].append(event)
 
     def get_train(self, name):
         for train in self.trains:

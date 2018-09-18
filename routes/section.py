@@ -35,6 +35,12 @@ class Section(object):
         """
         return self._data["sequence_number"]
 
+    def get_starting_point(self):
+        return self._data["starting_point"]
+
+    def get_ending_point(self):
+        return self._data["ending_point"]
+
     def get_penalty(self):
         """used in the objective function for the timetable.
         If a train uses this route_section, this penalty accrues.  This field is optional. If it is not present, this is equivalent to penalty = 0.

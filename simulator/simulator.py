@@ -9,10 +9,17 @@ from simulator.event import ReleaseResourceEvent
 from trains.requirement import HaltRequirement
 from simulator.event import humanize_time
 from collections import defaultdict
+from trains.solution import Solution
+from simulator.qtable import QTable, get_state_id
+import numpy as np
+
+
+class BlockinException(Exception):
+    pass
 
 
 class Simulator(object):
-    def __init__(self, path):
+    def __init__(self, path, qtable):
         self.timetable = Timetable(json_path=path)
         self.resources = self.timetable.resources
         self.trains = list(self.timetable.trains.values())
@@ -20,6 +27,7 @@ class Simulator(object):
 
         self.waiting = set()
         self.events = defaultdict(list)
+        self.qtable = qtable
 
     def create_output(self):
         output = {
@@ -32,7 +40,7 @@ class Simulator(object):
 
         for train in self.trains:
             section_output = []
-            for section in train.solution.sections:
+            for section in train.solution.sections[1:]:
                 r = section.get_requirement()
                 marker = None
                 if r is not None:
@@ -58,11 +66,13 @@ class Simulator(object):
                     occupation.resource.sections.append(section)
 
     def initialize(self):
+        self.waiting = set()
         self.events = defaultdict(list)
         self.assign_sections_to_resources()
         for train in self.trains:
             event = train.get_start_event()
             self.register_event(event)
+            train.solution = Solution(train=train)
 
     def compute_score(self):
         score = 0
@@ -101,16 +111,39 @@ class Simulator(object):
             self.register_event(next_event)
 
     def run(self):
-        i = 6 * 60 * 60
-        while i < 10 * 60 * 60:
+        i = 4 * 60 * 60
+        max_time = 24 * 60 * 60
+        while i < max_time:
             i += 1
             for event in self.events[i]:
-                print(event)
+                #logging.info(event)
                 self.run_next(event=event)
 
-        print("Done %s" % self.compute_score())
+        logging.info("Done %s" % self.compute_score())
 
     def on_node(self, event):
+        def wait(train):
+            self.waiting.add(train.get_id())
+            delay = 10
+            next_event = EnterNodeEvent(train=train, time=event.time + delay,
+                                        previous_section=event.previous_section,
+                                        node=event.node)
+            self.register_event(next_event)
+
+        def check_mutual_blocking(train):
+            for blocking_train_id in train.blocked_by():
+                blocking_train = self.get_train(blocking_train_id)
+
+                if train.get_id() in blocking_train.blocked_by():
+                    logging.error("mutual blocking %s<->%s" % (train, blocking_train))
+                    logging.error(
+                        "currently on sections %s at %s" % (event.previous_section, humanize_time(event.time)))
+                    self.qtable.update_table(train.solution.states[-2], train.solution.states[-1],
+                                             train.previous_action,
+                                             reward=None, blocked=True)
+
+                    raise BlockinException()
+
         train = event.train
 
         # We are at the end of the journey
@@ -119,43 +152,56 @@ class Simulator(object):
                                         previous_section=event.previous_section, next_section=None)
             self.register_event(next_event)
             train.solution.leave_section(exit_time=event.time)
-            logging.info("%s done" % train)
+            self.qtable.update_table(train.solution.states[-2], train.solution.states[-1], train.previous_action)
+            # logging.info("%s done" % train)
             return
 
         # We still have a few section to visit
         else:
-            sections = event.train.get_next_free_sections(node=event.node)
-            if len(sections) == 0:
-                sections.append(None)
-                # train is blocked, is the other train also blocked? if yes throw error
-            section = self.dispachter.choose(sections, train)
-            if section is None:
-                for blocking_train_id in train.blocked_by():
-                    blocking_train = self.get_train(blocking_train_id)
+            previous_section_id = event.previous_section
+            if previous_section_id is not None:
+                previous_section_id = previous_section_id.get_id()
 
-                    if train.get_id() in blocking_train.blocked_by():
-                        raise Exception("mutual blocking %s<->%s" % (train, blocking_train))
+            state = get_state_id(previous_section_id, train=train, trains=self.trains)
+            # logging.info(state)
 
-                self.waiting.add(train.get_id())
-                next_event = EnterNodeEvent(train=train, time=event.time + 30, previous_section=event.previous_section,
-                                            node=event.node)
-                self.register_event(next_event)
-                return
+            # choices = list(event.node.out_links) + [None]
+            free_sections = event.train.get_next_free_sections(node=event.node)
+            if previous_section_id is not None:
+                free_sections += [None]
+                action = self.qtable.get_action(choices=free_sections, state=state)
+            else:
+                action = list(event.node.out_links)[0]
+
+            if action is None:
+                check_mutual_blocking(train=train)
+                wait(train=train)
+                # train.previous_action = action
 
             else:
+                train.solution.states.append(state)
 
                 if train.get_id() in self.waiting:
                     self.waiting.remove(train.get_id())
 
-                train.solution.enter_section(section, entry_time=event.time)
-                # print("b", section, [str(r) for r in section.get_resources()])
-                self.block_resources(train=train, section=section)
+                train.solution.enter_section(action, entry_time=event.time)
+
+                # check
+
+                if len(train.solution.states) > 1:
+                    self.qtable.update_table(train.solution.states[-2], train.solution.states[-1],
+                                             train.previous_action)
+                    #self.qtable.update_table(train.solution.states[-2], train.solution.states[-1],
+                    #                         train.previous_action, reward=1000)
+                train.previous_action = action
+
+                self.block_resources(train=train, section=action)
 
                 next_event = LeaveNodeEvent(time=event.time, node=event.node, train=train,
-                                            previous_section=event.previous_section, next_section=section)
+                                            previous_section=event.previous_section, next_section=action)
                 self.register_event(next_event)
 
-                next_event = self.get_next_event(train=train, section=section, current_time=event.time)
+                next_event = self.get_next_event(train=train, section=action, current_time=event.time)
                 self.register_event(next_event)
                 return
 

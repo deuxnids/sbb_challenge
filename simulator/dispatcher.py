@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 
 class Dispatcher(object):
@@ -7,8 +8,14 @@ class Dispatcher(object):
         self.sim = sim
         self.wait = False
 
-    def choose(self, sections, train):
+    def choose(self, section):
+        choices = []
+        weights = []
+        for s in section.choices.keys():
+            choices.append(s)
+            weights.append(section.choices[s])
+
         #return sections[-1]
-        return random.choice(sections)
+        return np.random.choice(choices, p=np.array(weights)/sum(weights))
 
 

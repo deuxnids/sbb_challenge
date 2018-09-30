@@ -1,6 +1,7 @@
 import logging
 import copy
 from network.node import Node
+from routes.section import Section
 
 
 class Network(object):
@@ -23,7 +24,7 @@ class Network(object):
             return "start"
 
     def get_first_node(self):
-        return self.nodes["start"]
+        return self.nodes["depot"]
 
     def _get_end_node_id(self, section, next_section=None):
         marker = section.get_route_alternative_marker_at_exit()
@@ -66,5 +67,21 @@ class Network(object):
                 start_node.out_links.add(section)
 
                 self.sections[section.get_number()] = section
+
+        start_node = Node(label="depot")
+        end_node = self.nodes["start"]
+        section = copy.deepcopy(list(end_node.out_links)[-1])
+        section._data["sequence_number"] = -1
+        section._data["minimum_running_time"] = "PT1S"
+        section.start_node = start_node
+        section.requirement = None
+        section.occupations = []
+        section.end_node = end_node
+        start_node.out_links.add(section)
+        self.nodes["depot"] = start_node
+        self.sections[section.get_number()] = section
+
+        for section in self.sections.values():
+            section.init_weights()
 
 

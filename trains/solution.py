@@ -8,6 +8,8 @@ class Solution(object):
         self.train = train
         self.sections = []
         self._entry_time = None
+        self.done = False
+        self.states = []
 
     def leave_section(self, exit_time):
         self.sections[-1].exit_time = exit_time

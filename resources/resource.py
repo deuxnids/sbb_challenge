@@ -10,6 +10,7 @@ class Resource(object):
         self.free = True
         self.last_exit_time = None
         self.currently_used_by = None
+        self.blocks = []
 
     def get_id(self):
         return self.id

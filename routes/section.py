@@ -1,6 +1,8 @@
 import isodate
 from routes.occupation import Occupation
 
+MAX_TIME = 24 * 60 * 60
+
 
 class Section(object):
     def __init__(self, data, path):
@@ -22,6 +24,8 @@ class Section(object):
         requirements = [r for r in self.train.get_requirements() if r.get_section_marker() == self.get_marker()]
         if len(requirements) > 0:
             self.requirement = requirements[0]
+
+        self.choices = {}
 
     def __repr__(self):
         return "Section(id=%s)" % (self.get_id())
@@ -97,3 +101,26 @@ class Section(object):
             if not r.is_free_for(train=self.train):
                 return False
         return True
+
+    def init_weights(self):
+        links = list(self.end_node.out_links)
+        self.choices = {}
+        for link in links:
+            self.choices[link] = 1.0
+
+        self.choices[None] = 0.0
+
+    def calc_penalty(self):
+        value = 0.0
+
+        requirement = self.get_requirement()
+        if requirement is not None:
+            v = requirement.get_entry_delay_weight() * max(0, self.entry_time - requirement.get_entry_latest())
+            value += v
+            v = requirement.get_exit_delay_weight() * max(0, self.exit_time - requirement.get_exit_latest())
+            value += v
+
+        value = 1 / 60.0 * value
+        value += self.get_penalty()
+
+        return value

@@ -11,9 +11,10 @@ class Train(object):
         self.network = Network()
         self.solution = Solution(train=self)
         self.requirements = None
+        self.id = self._data["id"]
 
     def get_id(self):
-        return self._data["id"]
+        return self.id
 
     def get_sections(self):
         return list(self.network.sections.values())

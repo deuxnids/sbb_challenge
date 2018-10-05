@@ -11,15 +11,6 @@ class Solution(object):
         self.done = False
         self.states = []
 
-    def leave_section(self, exit_time):
-        self.sections[-1].exit_time = exit_time
-
-    def enter_section(self, section, entry_time):
-        if len(self.sections)>0:
-            self.sections[-1].exit_time = entry_time
-        section.entry_time = entry_time
-        self.sections.append(section)
-
     def compute_objective(self):
         value = 0.0
 

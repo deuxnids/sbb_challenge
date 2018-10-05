@@ -1,0 +1,56 @@
+import logging
+import sys
+import glob
+import os
+import json
+
+sys.path.append(r"/Users/denism/work/sbb_challenge")
+sys.path.append(r"/Users/denism/work/sbb_challenge/utils")
+
+from simulator.simulator import Simulator
+from simulator.simulator import BlockinException
+from simulator.qtable import QTable
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+FORMAT = "[%(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
+logging.basicConfig(format=FORMAT)
+
+path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/03*")[0]
+
+qtable = QTable()
+
+qtable.epsilon = 0.5
+qtable.alpha = 0.4
+qtable.gamma = 0.8
+
+sim = Simulator(path=path, qtable=qtable)
+sim.trains = sim.trains
+sim.assign_limit()
+
+i = 1
+sim.wait_time = 2 * 60.0
+
+score = 0.1
+
+while i < 200:
+    try:
+        sim.initialize()
+        sim.free_all_resources()
+
+        sim.run()
+        # print(humanize_time(sim.min_time), humanize_time(sim.max_time))
+        i += 1
+        sim.wait_time = max(sim.wait_time - 10.0, 1.0)
+        if sim.compute_score() < score:
+            break
+        print(sim.wait_time)
+    except BlockinException:
+        logging.info("--------")
+        pass
+
+folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"
+output_path = os.path.join(folder, sim.timetable.label + "_for_submission.json")
+with open(output_path, 'w') as outfile:
+    json.dump([sim.create_output()], outfile)

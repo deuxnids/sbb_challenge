@@ -70,9 +70,11 @@ class Network(object):
 
         start_node = Node(label="depot")
         end_node = self.nodes["start"]
-        section = copy.deepcopy(list(end_node.out_links)[-1])
-        section._data["sequence_number"] = -1
-        section._data["minimum_running_time"] = "PT1S"
+        _section = list(end_node.out_links)[-1]
+        _data = copy.deepcopy(_section._data)
+        _data["sequence_number"] = -1
+        _data["minimum_running_time"] = "PT1S"
+        section = Section(data=_data, path=_section.path)
         section.start_node = start_node
         section.requirement = None
         section.occupations = []

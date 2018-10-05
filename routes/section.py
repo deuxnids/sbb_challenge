@@ -26,12 +26,13 @@ class Section(object):
             self.requirement = requirements[0]
 
         self.choices = {}
+        self.id = "%s#%s" % (self.path._route.get_id(), self.get_number())
 
     def __repr__(self):
         return "Section(id=%s)" % (self.get_id())
 
     def get_id(self):
-        return "%s#%s" % (self.path._route.get_id(), self.get_number())
+        return self.id
 
     def get_number(self):
         """an ordering number.

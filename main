@@ -21,20 +21,21 @@ path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-star
 
 qtable = QTable()
 
-qtable.epsilon = 0.5
-qtable.alpha = 0.4
-qtable.gamma = 0.8
+qtable.epsilon = 0.9
+qtable.alpha = 0.5
+qtable.gamma = 0.5
 
 sim = Simulator(path=path, qtable=qtable)
 sim.trains = sim.trains
 sim.assign_limit()
 
 i = 1
-sim.wait_time = 2 * 60.0
+sim.wait_time = 1
+sim.max_delta = 60
 
 score = 0.1
 
-while i < 200:
+while i < 2:
     try:
         sim.initialize()
         sim.free_all_resources()
@@ -42,12 +43,13 @@ while i < 200:
         sim.run()
         # print(humanize_time(sim.min_time), humanize_time(sim.max_time))
         i += 1
-        sim.wait_time = max(sim.wait_time - 10.0, 1.0)
         if sim.compute_score() < score:
             break
         print(sim.wait_time)
     except BlockinException:
-        logging.info("--------")
+        n = len(sim.trains)
+        n2 = len([t for t in sim.trains if t.solution.done])
+        logging.info("%i/%i trains" % (n2, n))
         pass
 
 folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"

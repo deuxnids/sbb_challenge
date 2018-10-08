@@ -13,6 +13,7 @@ from trains.solution import Solution
 from simulator.qtable import QTable, get_state_id
 import numpy as np
 from network.dijkstra import dijkstra
+import random
 
 
 class BlockinException(Exception):
@@ -138,7 +139,20 @@ class Simulator(object):
         logging.info("Done %s" % self.compute_score())
 
     def on_node(self, event):
-        state = get_state_id(event.train, event.train.other_trains)
+        state = get_state_id(event.train, self.trains)
+
+        if event.time > event.node.limit + self.max_delta:
+            logging.info("%s: %s" % (humanize_time(event.time), event.train.solution.states[-1]))
+            for s in event.node.out_links:
+                for blocking_train in s.block_by():
+                    logging.info(blocking_train)
+                    for _l in blocking_train.solution.sections[-1].end_node.out_links:
+                        if event.train in _l.block_by():
+                            logging.info("mutual blocking")
+                            self.qtable.to_avoid[blocking_train.solution.states[-1]].add(blocking_train.solution.sections[-1].get_id())
+                            raise BlockinException()
+            self.qtable.to_avoid[event.train.solution.states[-1]].add(event.train.solution.sections[-1].get_id())
+            raise BlockinException()
 
         links = list(event.node.out_links)
         if len(links) == 0:
@@ -152,16 +166,17 @@ class Simulator(object):
         free_links = [l for l in links if l.is_free()]
 
         if len(free_links) == 0:
-            other_trains = [r.currently_used_by for l in links for r in l.get_resources() if
-                            r.currently_used_by is not event.train and r.currently_used_by is not None]
-            for other_train in other_trains:
-                if other_train.get_id() in self.waiting:
-                    logging.error(
-                        "%s Going on this link was a bad idea: %s" % (event, other_train.solution.sections[-1]))
-                    self.qtable.to_avoid[other_train.solution.states[-1]].add(
-                        other_train.solution.sections[-1].get_id())
-                    raise BlockinException()
-            self.waiting.add(event.train.get_id())
+            #other_trains = [r.currently_used_by for l in links for r in l.get_resources() if
+            #                r.currently_used_by is not event.train and r.currently_used_by is not None]
+            #for other_train in other_trains:
+            #    if other_train.get_id() in self.waiting:
+            #        logging.error(
+            #            "%s Going on this link was a bad idea: %s" % (event, other_train.solution.sections[-1]))
+            #        self.qtable.to_avoid[other_train.solution.states[-1]].add(
+            #            other_train.solution.sections[-1].get_id())
+            #        raise BlockinException()
+            #self.waiting.add(event.train.get_id())
+
             event.time += self.wait_time
             self.register_event(event)
             return
@@ -204,18 +219,6 @@ class Simulator(object):
 
             p_state = train.solution.states[-1]
             last_action = train.solution.sections[-1]
-
-            reward = 0
-            delta = last_action.end_node.limit - last_action.exit_time
-            if delta < 0:
-                reward = reward + delta
-            r = last_action.get_requirement()
-            if r is not None:
-                latest = r.get_exit_latest()
-                if latest is not None:
-                    delta = latest - last_action.exit_time
-                    if delta < 0:
-                        reward = reward + delta
             reward = - last_action.calc_penalty()
 
             self.qtable.update_table(p_state, current_state=state, previous_action=last_action, reward=reward)

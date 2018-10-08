@@ -125,3 +125,12 @@ class Section(object):
         value += self.get_penalty()
 
         return value
+
+    def block_by(self):
+        blocking_trains = []
+        for o in self.occupations:
+            r = o.resource
+
+            if r.currently_used_by is not None and r.currently_used_by != self.train:
+                blocking_trains.append(r.currently_used_by)
+        return blocking_trains

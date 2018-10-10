@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/03*")[0]
+path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/04*")[0]
 
 qtable = QTable()
 
@@ -31,11 +31,11 @@ sim.assign_limit()
 
 i = 1
 sim.wait_time = 1
-sim.max_delta = 60
+sim.max_delta = 5
 
-score = 0.1
+score = 0.7
 
-while i < 2:
+while i < 200:
     try:
         sim.initialize()
         sim.free_all_resources()
@@ -43,6 +43,7 @@ while i < 2:
         sim.run()
         # print(humanize_time(sim.min_time), humanize_time(sim.max_time))
         i += 1
+        qtable.epsilon = max(qtable.epsilon - 0.05, 0.1)
         if sim.compute_score() < score:
             break
         print(sim.wait_time)

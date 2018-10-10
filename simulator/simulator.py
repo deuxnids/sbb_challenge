@@ -86,7 +86,7 @@ class Simulator(object):
             event = train.get_start_event()
             self.register_event(event)
             train.solution.sections = []
-            train.solution.sections = []
+            train.solution.states = []
             train.solution.done = False
 
     def match_trains(self):
@@ -138,44 +138,40 @@ class Simulator(object):
 
         logging.info("Done %s" % self.compute_score())
 
-    def on_node(self, event):
-        state = get_state_id(event.train, self.trains)
+    def avoid(self, state, action):
+        self.qtable.to_avoid[state].add(action)
+        if state in self.qtable.q_values:
+            if action in self.qtable.q_values[state]:
+                del self.qtable.q_values[state]
 
-        if event.time > event.node.limit + self.max_delta:
-            logging.info("%s: %s" % (humanize_time(event.time), event.train.solution.states[-1]))
-            for s in event.node.out_links:
-                for blocking_train in s.block_by():
-                    logging.info(blocking_train)
-                    for _l in blocking_train.solution.sections[-1].end_node.out_links:
-                        if event.train in _l.block_by():
-                            logging.info("mutual blocking")
-                            self.qtable.to_avoid[blocking_train.solution.states[-1]].add(blocking_train.solution.sections[-1].get_id())
-                            raise BlockinException()
-            self.qtable.to_avoid[event.train.solution.states[-1]].add(event.train.solution.sections[-1].get_id())
-            raise BlockinException()
+    def on_node(self, event):
+        state = get_state_id(event.train, event.train.other_trains)  # self.trains)
 
         links = list(event.node.out_links)
         if len(links) == 0:
             event.train.solution.done = True
             self.go_to_section(from_section=event.previous_section, to_section=None, at=event.time)
-            self.update(train=event.train, state=state)
+            self.update(train=event.train, state=state, node=event.node)
             return
 
-        links = [l for l in links if l.get_id() not in self.qtable.to_avoid[state]]
+        _links = [l for l in links if l.get_id() not in self.qtable.to_avoid[state]]
 
-        free_links = [l for l in links if l.is_free()]
+        free_links = [l for l in _links if l.is_free()]
 
         if len(free_links) == 0:
-            #other_trains = [r.currently_used_by for l in links for r in l.get_resources() if
-            #                r.currently_used_by is not event.train and r.currently_used_by is not None]
-            #for other_train in other_trains:
-            #    if other_train.get_id() in self.waiting:
-            #        logging.error(
-            #            "%s Going on this link was a bad idea: %s" % (event, other_train.solution.sections[-1]))
-            #        self.qtable.to_avoid[other_train.solution.states[-1]].add(
-            #            other_train.solution.sections[-1].get_id())
-            #        raise BlockinException()
-            #self.waiting.add(event.train.get_id())
+
+            if event.time > event.node.limit + self.max_delta:
+
+                not_free_links = [l for l in links if not l.is_free()]
+                if len(not_free_links) > 0:
+                    l = not_free_links[0]
+                    if len(l.block_by()) > 0:
+                        t = l.block_by()[0]
+
+                        self.avoid(t.solution.states[-1], t.solution.sections[-1].get_id())
+                        raise BlockinException()
+
+            self.waiting.add(event.train.get_id())
 
             event.time += self.wait_time
             self.register_event(event)
@@ -193,7 +189,7 @@ class Simulator(object):
 
         self.go_to_section(from_section=event.previous_section, to_section=link, at=event.time)
 
-        self.update(train=event.train, state=state)
+        self.update(train=event.train, state=state, node=event.node)
 
         event.train.solution.sections.append(link)
         event.train.solution.states.append(state)
@@ -210,17 +206,15 @@ class Simulator(object):
     def free_all_resources(self):
         for train in self.trains:
             for s in train.network.sections.values():
-                if not s.is_free():
-                    for r in s.get_resources():
-                        r.free = True
+                for r in s.get_resources():
+                    r.free = True
+                    r.currently_used_by = None
 
-    def update(self, train, state):
+    def update(self, train, state, node):
         if len(train.solution.sections) > 0:
-
             p_state = train.solution.states[-1]
             last_action = train.solution.sections[-1]
             reward = - last_action.calc_penalty()
-
             self.qtable.update_table(p_state, current_state=state, previous_action=last_action, reward=reward)
 
     def go_to_section(self, from_section, to_section, at):

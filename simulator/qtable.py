@@ -26,7 +26,7 @@ class QTable(object):
 
     def get_max(self, state):
         link_ids = list(self.q_values[state].keys())
-        link_values = self.q_values[state].values()
+        link_values = list(self.q_values[state].values())
         link_id = link_ids[np.argmax(link_values)]
         return link_id
 
@@ -40,18 +40,19 @@ class QTable(object):
 
 
 def get_state_id(train, trains):
-    section_id = None
-    try:
-        section_id = train.solution.sections[-1]
-    except:
-        pass
-    _hash = "%s_%s/" % (train.get_id(), section_id)
-    for _train in trains:
-        __hash = "/"
-        try:
-            __hash = _train.solution.sections[-1].get_id()
-        except:
-            pass
-        _hash += "%s/" % __hash
+    limit = 5
+    n = len(train.solution.sections)
+    if n==0:
+        return "start_%s" % train
+    else:
+        s = train.solution.sections[-1]
+    flat_list = list(set([item for sublist in train.compute_routes(s.end_node, limit=limit) for item in sublist]))
+    flat_list = sorted(flat_list, key=lambda x: x.get_id())
 
-    return _hash
+    _id = "%s_%s->" % (train, s.get_id())
+
+    for item in flat_list:
+        ids = list(set(map(str, item.block_by())))
+        _id += "%s[" % item.get_id() + "-".join(ids) + "]"
+    return _id
+

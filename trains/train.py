@@ -3,7 +3,7 @@ from network.network import Network
 from simulator.event import EnterNodeEvent
 from trains.solution import Solution
 import copy
-
+import numpy as np
 
 class Train(object):
     def __init__(self, data):
@@ -28,7 +28,8 @@ class Train(object):
 
     def blocked_by(self):
         sections = self.get_next_sections()
-        ids = list(set([r.currently_used_by.get_id() for s in sections for r in s.get_resources() if r.currently_used_by is not None]))
+        ids = list(set([r.currently_used_by.get_id() for s in sections for r in s.get_resources() if
+                        r.currently_used_by is not None]))
         if self.get_id() in ids:
             ids.remove(self.get_id())
         return ids
@@ -51,7 +52,7 @@ class Train(object):
 
     def get_start_event(self):
         requirement = self.get_requirements()[0]
-        return EnterNodeEvent(train=self, node=self.get_first_node(), time=requirement.get_entry_earliest(),
+        return EnterNodeEvent(train=self, node=self.get_first_node(), time=requirement.get_entry_earliest()-1,
                               previous_section=None)
 
     def get_first_node(self):
@@ -63,20 +64,20 @@ class Train(object):
     def __eq__(self, other):
         return self.get_id() == other.get_id()
 
-    def compute_routes(self):
+    def compute_routes(self, start_node=None, limit=np.inf):
 
         def explore_node(node, links, routes):
             for link in node.out_links:
                 _links = copy.copy(links)
                 _links.append(link)
-                if link.end_node.label == "end":
-                    routes.append(links)
+                if link.end_node.label == "end" or len(_links)>limit:
+                    routes.append(_links)
                 else:
                     node = link.end_node
                     explore_node(node, _links, routes)
 
         routes = []
-
-        start_node = self.get_first_node()
+        if start_node is None:
+            start_node = self.get_first_node()
         explore_node(start_node, [], routes)
         return routes

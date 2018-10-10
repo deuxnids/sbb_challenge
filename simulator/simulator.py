@@ -138,7 +138,8 @@ class Simulator(object):
 
         logging.info("Done %s" % self.compute_score())
 
-    def avoid(self, state, action):
+    def avoid(self, state, action, causing_train):
+        logging.info("Because of %s on %s > Avoid %s on %s" % (causing_train, causing_train.solution.sections[-1], action, state))
         self.qtable.to_avoid[state].add(action)
         if state in self.qtable.q_values:
             if action in self.qtable.q_values[state]:
@@ -162,14 +163,19 @@ class Simulator(object):
 
             if event.time > event.node.limit + self.max_delta:
 
-                not_free_links = [l for l in links if not l.is_free()]
-                if len(not_free_links) > 0:
-                    l = not_free_links[0]
-                    if len(l.block_by()) > 0:
-                        t = l.block_by()[0]
+                # if random.uniform(0, 1) <  0.5:
 
-                        self.avoid(t.solution.states[-1], t.solution.sections[-1].get_id())
-                        raise BlockinException()
+                not_free_links = _links
+                _trains = [t for l in not_free_links for t in l.block_by() if t != event.train]
+                # if len(_trains) > 0:
+                for t in _trains:
+                    # t = np.random.choice(_trains)
+
+                    self.avoid(t.solution.states[-1], t.solution.sections[-1].get_id(), event.train)
+                    raise BlockinException()
+                # else:
+                #self.avoid(event.train.solution.states[-1], event.train.solution.sections[-1].get_id())
+                #raise BlockinException()
 
             self.waiting.add(event.train.get_id())
 

@@ -10,7 +10,7 @@ from trains.requirement import HaltRequirement
 from simulator.event import humanize_time
 from collections import defaultdict
 from trains.solution import Solution
-from simulator.qtable import QTable, get_state_id
+from simulator.qtable import QTable, get_state_id, get_state_avoid_id
 import numpy as np
 from network.dijkstra import dijkstra
 import random
@@ -148,46 +148,43 @@ class Simulator(object):
 
     def on_node(self, event):
         state = get_state_id(event.train, event.train.other_trains)  # self.trains)
+        state_to_avoid = get_state_avoid_id(event.train, event.train.other_trains)  # self.trains)
 
         links = list(event.node.out_links)
         if len(links) == 0:
             event.train.solution.done = True
             self.go_to_section(from_section=event.previous_section, to_section=None, at=event.time)
-            self.update(train=event.train, state=state, node=event.node)
+            self.update(train=event.train, state=state)
             return
 
-        _links = [l for l in links if l.get_id() not in self.qtable.to_avoid[state]]
+        links = [l for l in links if l.get_id() not in self.qtable.to_avoid[state_to_avoid]]
 
-        free_links = [l for l in _links if l.is_free()]
+        if len(links) == 0:
+            event.time += self.wait_time
+            self.register_event(event)
+            return
 
-        if len(free_links) == 0:
+        link = self.qtable.get_action(links, state)
+
+        if not link.is_free():
 
             if event.time > event.node.limit + self.max_delta:
 
-                # if random.uniform(0, 1) <  0.5:
-
-                not_free_links = _links
-                _trains = [t for l in not_free_links for t in l.block_by() if t != event.train]
-                # if len(_trains) > 0:
+                _trains = [t for t in link.block_by() if t != event.train]
                 for t in _trains:
-                    # t = np.random.choice(_trains)
+                    if len(t.solution.states)>1:
+                        c_state = t.solution.states[-1]
+                        p_state = t.solution.states[-2]
+                        p_action = t.solution.sections[-2]
+                        self.qtable.update_table(previous_state=p_state, previous_action=p_action, current_state=c_state, reward=-1)
+                    self.avoid(t.solution.states_to_avoid[-1], t.solution.sections[-1].get_id(), event.train)
 
-                    self.avoid(t.solution.states[-1], t.solution.sections[-1].get_id(), event.train)
-                    raise BlockinException()
-                # else:
-                # self.avoid(event.train.solution.states[-1], event.train.solution.sections[-1].get_id())
-                # raise BlockinException()
-
-            self.waiting.add(event.train.get_id())
+                raise BlockinException()
 
             event.time += self.wait_time
             self.register_event(event)
             return
 
-        if event.train.get_id() in self.waiting:
-            self.waiting.remove(event.train.get_id())
-
-        link = self.qtable.get_action(free_links, state)
         # can I already enter this link?
         if link.get_requirement() is not None and link.get_requirement().get_entry_earliest() is not None and event.time < link.get_requirement().get_entry_earliest():
             event = link.get_requirement().get_entry_earliest()
@@ -196,10 +193,11 @@ class Simulator(object):
 
         self.go_to_section(from_section=event.previous_section, to_section=link, at=event.time)
 
-        self.update(train=event.train, state=state, node=event.node)
+        self.update(train=event.train, state=state)
 
         event.train.solution.sections.append(link)
         event.train.solution.states.append(state)
+        event.train.solution.states_to_avoid.append(state_to_avoid)
 
     def assign_limit(self):
         for train in self.trains:
@@ -217,7 +215,7 @@ class Simulator(object):
                     r.free = True
                     r.currently_used_by = None
 
-    def update(self, train, state, node):
+    def update(self, train, state):
         if len(train.solution.sections) > 0:
             p_state = train.solution.states[-1]
             last_action = train.solution.sections[-1]

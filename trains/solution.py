@@ -10,6 +10,7 @@ class Solution(object):
         self._entry_time = None
         self.done = False
         self.states = []
+        self.states_to_avoid = []
 
     def compute_objective(self):
         value = 0.0

@@ -139,7 +139,8 @@ class Simulator(object):
         logging.info("Done %s" % self.compute_score())
 
     def avoid(self, state, action, causing_train):
-        logging.info("Because of %s on %s > Avoid %s on %s" % (causing_train, causing_train.solution.sections[-1], action, state))
+        logging.info("Because of %s on %s > Avoid %s on %s" % (
+            causing_train, causing_train.solution.sections[-1], action, state))
         self.qtable.to_avoid[state].add(action)
         if state in self.qtable.q_values:
             if action in self.qtable.q_values[state]:
@@ -174,8 +175,8 @@ class Simulator(object):
                     self.avoid(t.solution.states[-1], t.solution.sections[-1].get_id(), event.train)
                     raise BlockinException()
                 # else:
-                #self.avoid(event.train.solution.states[-1], event.train.solution.sections[-1].get_id())
-                #raise BlockinException()
+                # self.avoid(event.train.solution.states[-1], event.train.solution.sections[-1].get_id())
+                # raise BlockinException()
 
             self.waiting.add(event.train.get_id())
 

@@ -40,7 +40,7 @@ class QTable(object):
 
 
 def get_state_id(train, trains):
-    limit = 5
+    limit = 12
     n = len(train.solution.sections)
     if n==0:
         return "start_%s" % train
@@ -53,6 +53,7 @@ def get_state_id(train, trains):
 
     for item in flat_list:
         ids = list(set(map(str, item.block_by())))
-        _id += "%s[" % item.get_id() + "-".join(ids) + "]"
+        if len(ids)>0:
+            _id += "%s[" % item.get_id() + "-".join(ids) + "]"
     return _id
 

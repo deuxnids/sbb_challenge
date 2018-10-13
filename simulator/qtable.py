@@ -36,7 +36,7 @@ class QTable(object):
         self.q_values[previous_state][previous_action.get_id()] = new_value
 
 
-def get_state_avoid_id(train, trains):
+def get_state_avoid_id(train, sim):
     limit = 12
     n = len(train.solution.sections)
     if n == 0:
@@ -52,11 +52,12 @@ def get_state_avoid_id(train, trains):
         ids = list(set(map(str, item.block_by())))
         if len(ids) > 0:
             _id += "%s[" % item.get_id() + "-".join(ids) + "]"
+
     return _id
 
 
-def get_state_id(train, trains):
-    limit = 4
+def get_state_id(train, sim):
+    limit = 2
     n = len(train.solution.sections)
     if n == 0:
         return "start_%s" % train
@@ -71,4 +72,5 @@ def get_state_id(train, trains):
         ids = list(set(map(str, item.block_by())))
         if len(ids) > 0:
             _id += "%s[" % item.get_id() + "-".join(ids) + "]"
+
     return _id

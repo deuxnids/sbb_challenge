@@ -73,7 +73,9 @@ class Requirement(object):
         return 24*60*60*3
 
     def get_connections(self):
-        return [Connection(c) for c in self._data["connections"]]
+        if self._data["connections"] is None:
+            return []
+        return [Connection(c) for c in self._data["connections"] if c is not None]
 
     def get_entry_delay_weight(self):
         key = "entry_delay_weight"
@@ -109,9 +111,6 @@ class HaltRequirement(Requirement):
 class EndeRequirement(Requirement):
     def __init__(self, **kwargs):
         Requirement.__init__(self, **kwargs)
-
-    def get_connections(self):
-        return [Connection(c) for c in self._data["connections"]]
 
 
 def to_sec(txt):

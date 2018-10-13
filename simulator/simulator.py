@@ -103,6 +103,15 @@ class Simulator(object):
                     _trains.append(_train)
             train.other_trains = _trains
 
+            train.connection_trains = set()
+            for s in train.network.sections.values():
+                if s.get_requirement() is not None:
+                    for id in s.get_requirement().get_connections():
+                        c_t = self.get_train(id)
+                        if c_t is not None:
+                            train.connection_trains.add(c_t)
+            train.connection_trains = list(train.connection_trains)
+
     def compute_score(self):
         score = 0
         for train in self.trains:
@@ -146,9 +155,19 @@ class Simulator(object):
             if action in self.qtable.q_values[state]:
                 del self.qtable.q_values[state]
 
+    def is_late(self, event):
+        #return event.time > event.node.limit + self.max_delta
+        section = event.previous_section
+        t_out = section.entry_time + section.get_minimum_running_time()
+        requirement = section.get_requirement()
+        if requirement is not None:
+            t_out += requirement.get_min_stopping_time()
+            t_out = max(requirement.get_exit_earliest(), t_out)
+        return event.time > t_out + self.max_delta
+
     def on_node(self, event):
-        state = get_state_id(event.train, event.train.other_trains)  # self.trains)
-        state_to_avoid = get_state_avoid_id(event.train, event.train.other_trains)  # self.trains)
+        state = get_state_id(event.train, self)  # self.trains)
+        state_to_avoid = get_state_avoid_id(event.train, self)  # self.trains)
 
         links = list(event.node.out_links)
         if len(links) == 0:
@@ -167,8 +186,7 @@ class Simulator(object):
         link = self.qtable.get_action(links, state)
 
         if not link.is_free():
-
-            if event.time > event.node.limit + self.max_delta:
+            if self.is_late(event):
 
                 _trains = [t for t in link.block_by() if t != event.train]
                 for t in _trains:
@@ -190,6 +208,32 @@ class Simulator(object):
             event = link.get_requirement().get_entry_earliest()
             self.register_event(event)
             assert False
+
+        # can I already leave previous_section? or should I wait for a connecting train?
+        if event.previous_section is not None:
+            r = event.previous_section.get_requirement()
+            if r is not None:
+                for c in r.get_connections():
+                    connecting_train = self.get_train(c.get_onto_service_intention())
+                    marker = c.get_onto_section_marker()
+                    _s = None
+                    for c_s in connecting_train.solution.sections:
+                        if c_s.marker == marker:
+                            _s = c_s
+                            break
+                    if _s is None:
+                        #conencting train did not yet arrived. Need to wait..
+                        event.time += self.wait_time
+                        self.register_event(event)
+                        return
+                    else:
+                        #connection train is or has been on the section, check min time
+                        t2 = (_s.entry_time+_s.get_requirement().get_min_stopping_time())
+                        should_wait = t2-event.time<c.get_min_connection_time()
+                        if should_wait:
+                            event.time += self.wait_time
+                            self.register_event(event)
+                            return
 
         self.go_to_section(from_section=event.previous_section, to_section=link, at=event.time)
 

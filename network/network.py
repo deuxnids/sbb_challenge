@@ -14,43 +14,43 @@ class Network(object):
             self.add_route(route)
         logging.info("%i Nodes created" % len(self.nodes.keys()))
 
-    def _get_start_node_id(self, section, previous_section=None):
-        marker = section.get_route_alternative_marker_at_entry()
-        if marker is not None:
-            return str(marker)
-        elif previous_section is not None:
-            return str(previous_section.get_number()) + "->" + str(section.get_number())
+    def from_node_id(self, route_path, route_section, index_in_path):
+        if "route_alternative_marker_at_entry" in route_section.keys() and \
+                route_section["route_alternative_marker_at_entry"] is not None and \
+                len(route_section["route_alternative_marker_at_entry"]) > 0:
+            return "(" + str(route_section["route_alternative_marker_at_entry"][0]) + ")"
         else:
-            return "start"
+            if index_in_path == 0:  # can only get here if this node is a very beginning of a route
+                return "start"
+            else:
+                return "(" + (str(route_path["route_sections"][index_in_path - 1]["sequence_number"]) + "->" +
+                              str(route_section["sequence_number"])) + ")"
+
+    def to_node_id(self, route_path, route_section, index_in_path):
+        if "route_alternative_marker_at_exit" in route_section.keys() and \
+                route_section["route_alternative_marker_at_exit"] is not None and \
+                len(route_section["route_alternative_marker_at_exit"]) > 0:
+
+            return "(" + str(route_section["route_alternative_marker_at_exit"][0]) + ")"
+        else:
+            if index_in_path == (len(route_path["route_sections"]) - 1):  # meaning this node is a very end of a route
+                return "end"
+            else:
+                return "(" + (str(route_section["sequence_number"]) + "->" +
+                              str(route_path["route_sections"][index_in_path + 1]["sequence_number"])) + ")"
 
     def get_first_node(self):
         return self.nodes["depot"]
-
-    def _get_end_node_id(self, section, next_section=None):
-        marker = section.get_route_alternative_marker_at_exit()
-        if marker is not None:
-            return str(marker)
-        elif next_section is not None:
-            return str(section.get_number()) + "->" + str(next_section.get_number())
-        else:
-            return "end"
 
     def add_route(self, route):
         for path in route.get_paths().values():
             sections = path.get_sections()
             n = len(sections)
 
-            for i, section in enumerate(sorted(sections, key=lambda x: x.get_number())):
-                previous_section = None
-                next_section = None
+            for (i, section) in enumerate(sections):
 
-                if i > 0:
-                    previous_section = sections[i - 1]
-                if i < n - 1:
-                    next_section = sections[i + 1]
-
-                start_id = self._get_start_node_id(section, previous_section=previous_section)
-                end_id = self._get_end_node_id(section, next_section=next_section)
+                start_id = self.from_node_id(route_path=path._data, route_section=section._data, index_in_path=i)
+                end_id = self.to_node_id(route_path=path._data, route_section=section._data, index_in_path=i)
 
                 if start_id not in self.nodes:
                     self.nodes[start_id] = Node(label=start_id)
@@ -67,6 +67,16 @@ class Network(object):
                 start_node.out_links.add(section)
 
                 self.sections[section.get_number()] = section
+        for node_id in self.nodes:
+            node = self.nodes[node_id]
+            if len(node.in_links) == 0:
+                del self.nodes[node_id]
+                node.label = "start"
+                self.nodes["start"] = node
+            if len(node.out_links) == 0:
+                del self.nodes[node_id]
+                node.label = "end"
+                self.nodes["end"] = node
 
         start_node = Node(label="depot")
         end_node = self.nodes["start"]
@@ -78,6 +88,7 @@ class Network(object):
         section.start_node = start_node
         section.requirement = None
         section.occupations = []
+        section.marker = "depot"
         section.end_node = end_node
         start_node.out_links.add(section)
         self.nodes["depot"] = start_node
@@ -85,5 +96,3 @@ class Network(object):
 
         for section in self.sections.values():
             section.init_weights()
-
-

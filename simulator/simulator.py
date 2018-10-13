@@ -14,6 +14,7 @@ from simulator.qtable import QTable, get_state_id, get_state_avoid_id
 import numpy as np
 from network.dijkstra import dijkstra
 import random
+from trains.connection import WaitingConnection
 
 
 class BlockinException(Exception):
@@ -78,6 +79,7 @@ class Simulator(object):
         self.assign_sections_to_resources()
 
         self.match_trains()
+        self.spiegel_anschlusse()
         self.current_time = 0
         self.min_time = 9999999
         self.max_time = 0
@@ -111,6 +113,22 @@ class Simulator(object):
                         if c_t is not None:
                             train.connection_trains.add(c_t)
             train.connection_trains = list(train.connection_trains)
+
+    def spiegel_anschlusse(self):
+        for train in self.trains:
+            for s in train.network.sections.values():
+                r = s.get_requirement()
+                if r is not None:
+                    for c in r.get_connections():
+                        wc = WaitingConnection(from_train=train, from_section_marker=s.marker,
+                                               min_time=c.get_min_connection_time())
+                        to_train = self.get_train(c.get_onto_service_intention())
+                        for _s in to_train.network.sections.values():
+
+                            if _s.marker == s.marker:
+                                assert _s.get_requirement() is not None
+                                _r = _s.get_requirement()
+                                _r.waiting_connections.append(wc)
 
     def compute_score(self):
         score = 0
@@ -156,14 +174,15 @@ class Simulator(object):
                 del self.qtable.q_values[state]
 
     def is_late(self, event):
-        #return event.time > event.node.limit + self.max_delta
+        return event.time > event.node.limit + self.max_delta
         section = event.previous_section
         t_out = section.entry_time + section.get_minimum_running_time()
         requirement = section.get_requirement()
         if requirement is not None:
             t_out += requirement.get_min_stopping_time()
             t_out = max(requirement.get_exit_earliest(), t_out)
-        return event.time > t_out + self.max_delta
+        d = event.time > (t_out + self.max_delta)
+        return d
 
     def on_node(self, event):
         state = get_state_id(event.train, self)  # self.trains)
@@ -173,7 +192,7 @@ class Simulator(object):
         if len(links) == 0:
             event.train.solution.done = True
             self.go_to_section(from_section=event.previous_section, to_section=None, at=event.time)
-            self.update(train=event.train, state=state)
+            self.update(train=event.train, state=state, time=event.time)
             return
 
         links = [l for l in links if l.get_id() not in self.qtable.to_avoid[state_to_avoid]]
@@ -190,11 +209,12 @@ class Simulator(object):
 
                 _trains = [t for t in link.block_by() if t != event.train]
                 for t in _trains:
-                    if len(t.solution.states)>1:
+                    if len(t.solution.states) > 1:
                         c_state = t.solution.states[-1]
                         p_state = t.solution.states[-2]
                         p_action = t.solution.sections[-2]
-                        self.qtable.update_table(previous_state=p_state, previous_action=p_action, current_state=c_state, reward=-1)
+                        self.qtable.update_table(previous_state=p_state, previous_action=p_action,
+                                                 current_state=c_state, reward=-1)
                     self.avoid(t.solution.states_to_avoid[-1], t.solution.sections[-1].get_id(), event.train)
 
                 raise BlockinException()
@@ -210,26 +230,25 @@ class Simulator(object):
             assert False
 
         # can I already leave previous_section? or should I wait for a connecting train?
-        if event.previous_section is not None:
+        if event.previous_section is not None and self.with_connections:
             r = event.previous_section.get_requirement()
             if r is not None:
-                for c in r.get_connections():
-                    connecting_train = self.get_train(c.get_onto_service_intention())
-                    marker = c.get_onto_section_marker()
+                for c in r.waiting_connections:
+                    connecting_train = c.from_train
+                    marker = c.from_section_marker
                     _s = None
                     for c_s in connecting_train.solution.sections:
                         if c_s.marker == marker:
                             _s = c_s
                             break
                     if _s is None:
-                        #conencting train did not yet arrived. Need to wait..
+                        # conencting train did not yet arrived. Need to wait..
                         event.time += self.wait_time
                         self.register_event(event)
                         return
                     else:
-                        #connection train is or has been on the section, check min time
-                        t2 = (_s.entry_time+_s.get_requirement().get_min_stopping_time())
-                        should_wait = t2-event.time<c.get_min_connection_time()
+                        # connection train is or has been on the section, check min time
+                        should_wait = event.time - _s.entry_time < c.min_connection_time
                         if should_wait:
                             event.time += self.wait_time
                             self.register_event(event)
@@ -237,7 +256,7 @@ class Simulator(object):
 
         self.go_to_section(from_section=event.previous_section, to_section=link, at=event.time)
 
-        self.update(train=event.train, state=state)
+        self.update(train=event.train, state=state, time=event.time)
 
         event.train.solution.sections.append(link)
         event.train.solution.states.append(state)
@@ -259,11 +278,13 @@ class Simulator(object):
                     r.free = True
                     r.currently_used_by = None
 
-    def update(self, train, state):
+    def update(self, train, state, time):
         if len(train.solution.sections) > 0:
             p_state = train.solution.states[-1]
             last_action = train.solution.sections[-1]
-            reward = - last_action.calc_penalty()
+            delay = -max(0,  time - last_action.end_node.limit)
+
+            reward = 10.0 - last_action.calc_penalty() + delay*100
             self.qtable.update_table(p_state, current_state=state, previous_action=last_action, reward=reward)
 
     def go_to_section(self, from_section, to_section, at):

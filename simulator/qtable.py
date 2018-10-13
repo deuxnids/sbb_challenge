@@ -37,7 +37,7 @@ class QTable(object):
 
 
 def get_state_avoid_id(train, sim):
-    limit = 12
+    limit = sim.n_state_avoid
     n = len(train.solution.sections)
     if n == 0:
         return "start_%s" % train
@@ -57,7 +57,7 @@ def get_state_avoid_id(train, sim):
 
 
 def get_state_id(train, sim):
-    limit = 2
+    limit = sim.n_state
     n = len(train.solution.sections)
     if n == 0:
         return "start_%s" % train

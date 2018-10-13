@@ -18,6 +18,7 @@ class Requirement(object):
     def __init__(self, data, train):
         self._data = data
         self.train = train
+        self.waiting_connections = []
 
     @staticmethod
     def factory(data, **kwargs):
@@ -46,7 +47,7 @@ class Requirement(object):
         key = "min_stopping_time"
         if key in self._data:
             return isodate.parse_duration(self._data["min_stopping_time"]).seconds
-        return None
+        return 0.0
 
     def get_entry_earliest(self):
         key = "entry_earliest"

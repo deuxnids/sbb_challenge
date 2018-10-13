@@ -2,6 +2,7 @@ import isodate
 from routes.occupation import Occupation
 
 MAX_TIME = 24 * 60 * 60
+import numpy as np
 
 
 class Section(object):
@@ -9,8 +10,8 @@ class Section(object):
         self._data = data
         self.path = path
         self.train = path._route.train
-        self.entry_time = 9999999
-        self.exit_time = 9999999
+        self.entry_time = np.inf
+        self.exit_time = np.inf
         self.start_node = None
         self.end_node = None
         self.occupations = [Occupation(data=d, section=self) for d in self._data["resource_occupations"]]

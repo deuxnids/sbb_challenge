@@ -18,3 +18,10 @@ class Connection(object):
 
     def get_min_connection_time(self):
         return isodate.parse_duration(self._data["min_connection_time"]).seconds
+
+
+class WaitingConnection(object):
+    def __init__(self, from_train, from_section_marker, min_time):
+        self.from_train = from_train
+        self.from_section_marker = from_section_marker
+        self.min_connection_time = min_time

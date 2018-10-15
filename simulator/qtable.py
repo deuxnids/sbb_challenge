@@ -14,6 +14,14 @@ class QTable(object):
 
         self.to_avoid = defaultdict(set)
 
+    def add_avoid(self, state, action):
+        self.to_avoid[state].add(action)
+
+    def remove(self, state, action):
+        if state in self.q_values:
+            if action in self.q_values[state]:
+                del self.q_values[state]
+
     def get_action(self, choices, state):
 
         if random.uniform(0, 1) < self.epsilon:
@@ -46,7 +54,9 @@ def get_state_avoid_id(train, sim):
     flat_list = list(set([item for sublist in train.compute_routes(s.end_node, limit=limit) for item in sublist]))
     flat_list = sorted(flat_list, key=lambda x: x.get_id())
 
-    _id = "%s_%s->" % (train, s.get_id())
+    _id = "%s->" % (s.get_id())
+    #_id += "-".join([t.solution.sections[-1].get_id() for t in train.other_trains if len(t.solution.sections) > 0])
+    #return _id
 
     for item in flat_list:
         ids = list(set(map(str, item.block_by())))

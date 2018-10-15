@@ -10,17 +10,17 @@ sys.path.append(r"/Users/denism/work/sbb_challenge/utils")
 from simulator.simulator import Simulator
 from simulator.simulator import BlockinException
 from simulator.qtable import QTable
+from simulator.event import humanize_time
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-FORMAT = "[%(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
 path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/06*")[0]
 
 qtable = QTable()
-
 
 sim = Simulator(path=path, qtable=qtable)
 sim.trains = sim.trains
@@ -28,33 +28,38 @@ sim.assign_limit()
 
 i = 1
 
-sim.wait_time = 10
-sim.max_delta = 15*60
-sim.n_state = 4
+sim.wait_time = 30
+sim.max_delta = 15 * 60
+sim.n_state = 2
 sim.n_state_avoid = 12
 sim.with_connections = True
 
-qtable.epsilon = 0.9
-qtable.alpha = 0.5 # learning rate
-qtable.gamma = 0.5 # discount factor
+qtable.epsilon = 0.1
+qtable.alpha = 0.5  # learning rate
+qtable.gamma = 0.5  # discount factor
+trains = list(sim.trains)
+#trains = sorted(trains, key = lambda train: list(train.network.nodes["start"].out_links)[0].get_requirement().get_entry_earliest())
 
 
 score = 200
-while i < 2:
+n_trains = 50
+while i < 2 or n_trains <= len(trains):
     try:
         sim.initialize()
         sim.free_all_resources()
         #qtable.epsilon = max(qtable.epsilon - 0.01, 0.1)
+ #       sim.trains = trains[:n_trains]
         sim.run()
         # print(humanize_time(sim.min_time), humanize_time(sim.max_time))
+        if n_trains >= 50:
+            n_trains += 1
+        else:
+            n_trains += 5
         i += 1
-        if sim.compute_score() < score:
-            break
-        print(sim.wait_time)
     except BlockinException:
         n = len(sim.trains)
         n2 = len([t for t in sim.trains if t.solution.done])
-        logging.info("%i/%i trains" % (n2, n))
+        logging.info("%s: %i/%i trains (%i)" % (humanize_time(sim.current_time), n2, n, n_trains))
         pass
 
 folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"

@@ -123,12 +123,12 @@ class Simulator(object):
                         wc = WaitingConnection(from_train=train, from_section_marker=s.marker,
                                                min_time=c.get_min_connection_time())
                         to_train = self.get_train(c.get_onto_service_intention())
-                        for _s in to_train.network.sections.values():
-
-                            if _s.marker == s.marker:
-                                assert _s.get_requirement() is not None
-                                _r = _s.get_requirement()
-                                _r.waiting_connections.append(wc)
+                        if to_train is not None:
+                            for _s in to_train.network.sections.values():
+                                if _s.marker == s.marker:
+                                    assert _s.get_requirement() is not None
+                                    _r = _s.get_requirement()
+                                    _r.waiting_connections.append(wc)
 
     def compute_score(self):
         score = 0
@@ -166,16 +166,18 @@ class Simulator(object):
         logging.info("Done %s" % self.compute_score())
 
     def avoid(self, state, action, causing_train):
+        if "#-1" in action:
+            return
         logging.info("Because of %s on %s > Avoid %s on %s" % (
             causing_train, causing_train.solution.sections[-1], action, state))
-        self.qtable.to_avoid[state].add(action)
-        if state in self.qtable.q_values:
-            if action in self.qtable.q_values[state]:
-                del self.qtable.q_values[state]
+        self.qtable.add_avoid(state, action)
+        self.qtable.remove(state, action)
 
     def is_late(self, event):
-        return event.time > event.node.limit + self.max_delta
+        # return event.time > event.node.limit + self.max_delta
         section = event.previous_section
+        if section is None:
+            return False
         t_out = section.entry_time + section.get_minimum_running_time()
         requirement = section.get_requirement()
         if requirement is not None:
@@ -198,9 +200,15 @@ class Simulator(object):
         links = [l for l in links if l.get_id() not in self.qtable.to_avoid[state_to_avoid]]
 
         if len(links) == 0:
-            event.time += self.wait_time
-            self.register_event(event)
-            return
+            if self.is_late(event):
+                self.avoid(event.train.solution.states_to_avoid[-1], event.train.solution.sections[-1].get_id(),
+                           event.train)
+                raise BlockinException()
+
+            else:
+                event.time += self.wait_time
+                self.register_event(event)
+                return
 
         link = self.qtable.get_action(links, state)
 
@@ -209,15 +217,8 @@ class Simulator(object):
 
                 _trains = [t for t in link.block_by() if t != event.train]
                 for t in _trains:
-                    if len(t.solution.states) > 1:
-                        c_state = t.solution.states[-1]
-                        p_state = t.solution.states[-2]
-                        p_action = t.solution.sections[-2]
-                        self.qtable.update_table(previous_state=p_state, previous_action=p_action,
-                                                 current_state=c_state, reward=-1)
                     self.avoid(t.solution.states_to_avoid[-1], t.solution.sections[-1].get_id(), event.train)
-
-                raise BlockinException()
+                    raise BlockinException()
 
             event.time += self.wait_time
             self.register_event(event)
@@ -282,9 +283,8 @@ class Simulator(object):
         if len(train.solution.sections) > 0:
             p_state = train.solution.states[-1]
             last_action = train.solution.sections[-1]
-            delay = -max(0,  time - last_action.end_node.limit)
 
-            reward = 10.0 - last_action.calc_penalty() + delay*100
+            reward = 10.0 - last_action.calc_penalty()
             self.qtable.update_table(p_state, current_state=state, previous_action=last_action, reward=reward)
 
     def go_to_section(self, from_section, to_section, at):

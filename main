@@ -31,15 +31,17 @@ i = 1
 sim.wait_time = 30
 sim.max_delta = 15 * 60
 sim.n_state = 2
-sim.n_state_avoid = 12
+sim.n_state_avoid = 2
 sim.with_connections = True
 
-qtable.epsilon = 0.1
+qtable.epsilon = 0.2
 qtable.alpha = 0.5  # learning rate
 qtable.gamma = 0.5  # discount factor
 trains = list(sim.trains)
 #trains = sorted(trains, key = lambda train: list(train.network.nodes["start"].out_links)[0].get_requirement().get_entry_earliest())
 
+sim.match_trains()
+sim.spiegel_anschlusse()
 
 score = 200
 n_trains = 50
@@ -59,7 +61,7 @@ while i < 2 or n_trains <= len(trains):
     except BlockinException:
         n = len(sim.trains)
         n2 = len([t for t in sim.trains if t.solution.done])
-        logging.info("%s: %i/%i trains (%i)" % (humanize_time(sim.current_time), n2, n, n_trains))
+        logging.info("%s: %i/%i trains" % (humanize_time(sim.current_time), n2, n))
         pass
 
 folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"

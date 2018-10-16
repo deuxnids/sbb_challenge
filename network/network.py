@@ -63,8 +63,8 @@ class Network(object):
                 section.start_node = start_node
                 section.end_node = end_node
 
-                end_node.in_links.add(section)
-                start_node.out_links.add(section)
+                end_node.in_links.append(section)
+                start_node.out_links.append(section)
 
                 self.sections[section.get_number()] = section
         for node_id in self.nodes:
@@ -90,7 +90,7 @@ class Network(object):
         section.occupations = []
         section.marker = "depot"
         section.end_node = end_node
-        start_node.out_links.add(section)
+        start_node.out_links.append(section)
         self.nodes["depot"] = start_node
         self.sections[section.get_number()] = section
 

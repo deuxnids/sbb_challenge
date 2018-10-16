@@ -78,8 +78,6 @@ class Simulator(object):
         self.events = defaultdict(list)
         self.assign_sections_to_resources()
 
-        self.match_trains()
-        self.spiegel_anschlusse()
         self.current_time = 0
         self.min_time = 9999999
         self.max_time = 0
@@ -92,19 +90,7 @@ class Simulator(object):
             train.solution.done = False
 
     def match_trains(self):
-        resources = {}
         for train in self.trains:
-            resources[train.get_id()] = set([r.get_id() for s in train.get_sections() for r in s.get_resources()])
-
-        for train in self.trains:
-            _trains = []
-            rs = resources[train.get_id()]
-            for _train in self.trains:
-                _rs = resources[_train.get_id()]
-                if len(_rs.intersection(rs)) > 0:
-                    _trains.append(_train)
-            train.other_trains = _trains
-
             train.connection_trains = set()
             for s in train.network.sections.values():
                 if s.get_requirement() is not None:
@@ -190,7 +176,7 @@ class Simulator(object):
         state = get_state_id(event.train, self)  # self.trains)
         state_to_avoid = get_state_avoid_id(event.train, self)  # self.trains)
 
-        links = list(event.node.out_links)
+        links = event.node.out_links
         if len(links) == 0:
             event.train.solution.done = True
             self.go_to_section(from_section=event.previous_section, to_section=None, at=event.time)

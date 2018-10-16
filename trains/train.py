@@ -24,7 +24,7 @@ class Train(object):
             node = self.get_first_node()
         else:
             node = self.solution.sections[-1].end_node
-        return list(node.out_links)
+        return node.out_links
 
     def blocked_by(self):
         sections = self.get_next_sections()
@@ -66,18 +66,18 @@ class Train(object):
 
     def compute_routes(self, start_node=None, limit=np.inf):
 
-        def explore_node(node, links, routes):
-            for link in node.out_links:
-                _links = copy.copy(links)
-                _links.append(link)
-                if link.end_node.label == "end" or len(_links)>limit:
-                    routes.append(_links)
-                else:
-                    node = link.end_node
-                    explore_node(node, _links, routes)
+        def findPaths(node, n):
+            if n == 0 or len(node.out_links) == 0:
+                return [[]]
+            paths = [[link] + path for link in node.out_links for path in findPaths(link.end_node, n - 1) if
+                     link not in path]
+            return paths
 
-        routes = []
         if start_node is None:
             start_node = self.get_first_node()
-        explore_node(start_node, [], routes)
-        return routes
+        return findPaths(start_node, n=limit)
+
+
+    #TODO improve:
+        # explore_node
+        # avoid list(end_links)

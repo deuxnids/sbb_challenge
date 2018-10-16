@@ -6,7 +6,7 @@ import logging
 
 class QTable(object):
     def __init__(self):
-        self.q_values = defaultdict(lambda: defaultdict(lambda: 0))
+        self.q_values = defaultdict(lambda: defaultdict(lambda: random.randint(-2, 2 )))
 
         self.epsilon = 0.9
         self.alpha = 0.1
@@ -23,6 +23,8 @@ class QTable(object):
                 del self.q_values[state]
 
     def get_action(self, choices, state):
+        if len(choices)==1:
+            return choices[0]
 
         if random.uniform(0, 1) < self.epsilon:
             action = random.choice(choices)  # Explore action space
@@ -33,6 +35,7 @@ class QTable(object):
                 value = self.q_values[state][c.get_id()]
                 if value > max_value:
                     action = c
+                    max_value = value
         return action
 
     def update_table(self, previous_state, current_state, previous_action, reward):

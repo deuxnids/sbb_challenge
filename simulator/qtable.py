@@ -6,13 +6,13 @@ import logging
 
 class QTable(object):
     def __init__(self):
-        self.q_values = defaultdict(lambda: defaultdict(lambda: random.randint(-2, 2 )))
+        self.q_values = defaultdict(lambda: defaultdict(lambda: random.randint(-2, 2)))
 
         self.epsilon = 0.9
         self.alpha = 0.1
         self.gamma = 0.6
 
-        self.to_avoid = defaultdict(set)
+        self.to_avoid = defaultdict(lambda: defaultdict(list))
 
     def add_avoid(self, state, action):
         self.to_avoid[state].add(action)
@@ -23,7 +23,7 @@ class QTable(object):
                 del self.q_values[state]
 
     def get_action(self, choices, state):
-        if len(choices)==1:
+        if len(choices) == 1:
             return choices[0]
 
         if random.uniform(0, 1) < self.epsilon:
@@ -58,8 +58,8 @@ def get_state_avoid_id(train, sim):
     flat_list = sorted(flat_list, key=lambda x: x.get_id())
 
     _id = "%s->" % (s.get_id())
-    #_id += "-".join([t.solution.sections[-1].get_id() for t in train.other_trains if len(t.solution.sections) > 0])
-    #return _id
+    # _id += "-".join([t.solution.sections[-1].get_id() for t in train.other_trains if len(t.solution.sections) > 0])
+    # return _id
 
     for item in flat_list:
         ids = list(set(map(str, item.block_by())))

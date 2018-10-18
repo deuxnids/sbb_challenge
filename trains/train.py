@@ -77,7 +77,8 @@ class Train(object):
             start_node = self.get_first_node()
         return findPaths(start_node, n=limit)
 
-
+    def __hash__(self):
+        return hash(self.get_id())
     #TODO improve:
         # explore_node
         # avoid list(end_links)

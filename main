@@ -18,7 +18,7 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/06*")[0]
+path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/02*")[0]
 
 qtable = QTable()
 
@@ -29,7 +29,7 @@ sim.assign_limit()
 i = 1
 
 sim.wait_time = 30
-sim.max_delta = 15 * 60
+sim.max_delta = 5 * 60
 sim.n_state = 8
 sim.n_state_avoid = 8
 sim.with_connections = True

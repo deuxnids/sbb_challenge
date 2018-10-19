@@ -219,7 +219,8 @@ class Simulator(object):
         if not link.is_free():
             if self.is_late(event):
                 _trains = [t for t in link.block_by() if t != event.train]
-                self.avoid(event.train, random.choice(_trains), event)
+                if len(_trains) > 0:
+                    self.avoid(event.train, random.choice(_trains), event)
 
             event.time += self.wait_time
             self.register_event(event)
@@ -271,11 +272,11 @@ class Simulator(object):
         if train2 in to_avoid:
             link1 = to_avoid[train1]
             self.qtable.to_avoid[link2][train1].append(link1)
-        #ellse:
-           # to_avoid = train2.solution.states_to_avoid[-1]
-           # link1 = to_avoid[train1]
-           # link2 = train2.solution.sections[-1]
-           # self.qtable.to_avoid[link2][train1].append(link1)
+            # ellse:
+            # to_avoid = train2.solution.states_to_avoid[-1]
+            # link1 = to_avoid[train1]
+            # link2 = train2.solution.sections[-1]
+            # self.qtable.to_avoid[link2][train1].append(link1)
             pass
         logging.info(event)
         raise BlockinException()

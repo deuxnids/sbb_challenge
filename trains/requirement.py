@@ -74,6 +74,8 @@ class Requirement(object):
         return 24*60*60*3
 
     def get_connections(self):
+        if "connecions" not in self._data:
+            return []
         if self._data["connections"] is None:
             return []
         return [Connection(c) for c in self._data["connections"] if c is not None]

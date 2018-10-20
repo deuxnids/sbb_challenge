@@ -5,6 +5,7 @@ from trains.solution import Solution
 import copy
 import numpy as np
 
+
 class Train(object):
     def __init__(self, data):
         self._data = data
@@ -12,6 +13,7 @@ class Train(object):
         self.solution = Solution(train=self)
         self.requirements = None
         self.id = self._data["id"]
+        self.hash = hash(self.get_id())
 
     def get_id(self):
         return self.id
@@ -52,7 +54,7 @@ class Train(object):
 
     def get_start_event(self):
         requirement = self.get_requirements()[0]
-        return EnterNodeEvent(train=self, node=self.get_first_node(), time=requirement.get_entry_earliest()-1,
+        return EnterNodeEvent(train=self, node=self.get_first_node(), time=requirement.get_entry_earliest() - 1,
                               previous_section=None)
 
     def get_first_node(self):
@@ -78,7 +80,7 @@ class Train(object):
         return findPaths(start_node, n=limit)
 
     def __hash__(self):
-        return hash(self.get_id())
-    #TODO improve:
-        # explore_node
-        # avoid list(end_links)
+        return self.hash
+    # TODO improve:
+    # explore_node
+    # avoid list(end_links)

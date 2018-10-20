@@ -92,13 +92,20 @@ class Simulator(object):
         for train in self.trains:
             resources[train.get_id()] = set([r.get_id() for s in train.get_sections() for r in s.get_resources()])
 
+        delta = 60*60
         for train in self.trains:
             _trains = []
+            start = train.network.nodes["start"].limit
+            stop = train.network.nodes["end"].limit
             rs = resources[train.get_id()]
             for _train in self.trains:
                 _rs = resources[_train.get_id()]
                 if len(_rs.intersection(rs)) > 0:
-                    _trains.append(_train)
+                    _start = _train.network.nodes["start"].limit
+                    _stop = _train.network.nodes["end"].limit
+
+                    if(start -delta <= _stop <= stop + delta) or (_start -delta <= stop <= _stop+delta):
+                        _trains.append(_train)
             train.other_trains = _trains
 
         for train in self.trains:
@@ -162,18 +169,18 @@ class Simulator(object):
         logging.info("Done %s" % self.compute_score())
 
     def is_late(self, event):
-        return event.time > event.node.limit + self.max_delta
+        #return event.time > event.node.limit + self.max_delta
 
-    #    section = event.previous_section
-    #    if section is None:
-    #        return False
-    #    t_out = section.entry_time + section.get_minimum_running_time()
-    #    requirement = section.get_requirement()
-    #    if requirement is not None:
-    #        t_out += requirement.get_min_stopping_time()
-    #        t_out = max(requirement.get_exit_earliest(), t_out)
-    #    d = event.time > (t_out + self.max_delta)
-    #    return d
+        section = event.previous_section
+        if section is None:
+            return False
+        t_out = section.entry_time + section.get_minimum_running_time()
+        requirement = section.get_requirement()
+        if requirement is not None:
+            t_out += requirement.get_min_stopping_time()
+            t_out = max(requirement.get_exit_earliest(), t_out)
+        d = event.time > (t_out + self.max_delta)
+        return d
 
     def on_node(self, event):
         state = get_state_id(event.train, self)  # self.trains)
@@ -187,32 +194,19 @@ class Simulator(object):
 
         c_link = event.previous_section
         if c_link is not None:
-            _links = []
-            _trains = [t for t in event.train.other_trains if len(t.solution.sections) > 0]
-            for l in links:
-                should_keep = True
-                for t in _trains:
-                    other_link = t.solution.sections[-1]
-                    if other_link in self.qtable.to_avoid[l][t]:
-                        should_keep = False
-                        break
-                if should_keep:
-                    _links.append(l)
-            links = _links
+            links = self.remove_link_to_avoid(links, event.train)
+
+        #links = [link for link in links if link.is_free()]
 
         if len(links) == 0:
             event.time += self.wait_time
             self.register_event(event)
             return
 
-        _links = [link for link in links if link.is_free()]
-        link = self.qtable.get_action(_links, state)
+        link = self.qtable.get_action(links, state)
 
-        if len(_links) == 0 or not link.is_free():
+        if not link.is_free():
             if self.is_late(event):
-                if len(_links) == 0:
-                    link = random.choice(links)
-
                 _trains = [t for t in link.block_by() if t != event.train]
                 if len(_trains) > 0:
                     self.avoid(event.train, random.choice(_trains), event)
@@ -260,6 +254,23 @@ class Simulator(object):
         event.train.solution.states.append(state)
         event.train.solution.states_to_avoid.append(
             {t: t.solution.sections[-1] for t in event.train.other_trains if len(t.solution.sections) > 0})
+
+    def remove_link_to_avoid(self, links, train):
+        _links = []
+        _trains = [t for t in train.other_trains if len(t.solution.sections) > 0]
+        for l in links:
+            should_keep = True
+            bb = self.qtable.to_avoid[l]
+            for t in bb.keys():
+                if t in _trains:
+                    other_link = t.solution.sections[-1]
+                    if other_link in bb[t]:
+                        should_keep = False
+                    break
+            if should_keep:
+                _links.append(l)
+        links = _links
+        return links
 
     def avoid(self, train1, train2, event):
 #        # train1 = blocked train

@@ -50,5 +50,5 @@ class Resource(object):
         self.currently_used_by = train
 
     def release(self, release_time):
-        if self.currently_used_by is None and release_time >= self.last_exit_time:
+        if self.currently_used_by is None:
             self.free = True

@@ -30,7 +30,7 @@ def setup_translation_table(file):
     return GER_2_ENG, ENG_2_GER
 ############################################################################################################
 
-# main function that does the translation recursively
+# main.py function that does the translation recursively
 ############################################################################################################
 def translate(d, translation_function):
     """

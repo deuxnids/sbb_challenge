@@ -79,7 +79,6 @@ class ReleaseResourceEvent(Event):
         Event.__init__(self, **kwargs)
         self.resource = resource
         self.emited_at = emited_at
-        self.priority = 10
 
     def __str__(self):
         return super(ReleaseResourceEvent, self).__str__() + " release resource %s" % self.resource

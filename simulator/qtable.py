@@ -47,28 +47,6 @@ class QTable(object):
         self.q_values[previous_state][previous_action.get_id()] = new_value
 
 
-def get_state_avoid_id(train, sim):
-    limit = sim.n_state_avoid
-    n = len(train.solution.sections)
-    if n == 0:
-        return "start_%s" % train
-    else:
-        s = train.solution.sections[-1]
-    flat_list = list(set([item for sublist in train.compute_routes(s.end_node, limit=limit) for item in sublist]))
-    flat_list = sorted(flat_list, key=lambda x: x.get_id())
-
-    _id = "%s->" % (s.get_id())
-    # _id += "-".join([t.solution.sections[-1].get_id() for t in train.other_trains if len(t.solution.sections) > 0])
-    # return _id
-
-    for item in flat_list:
-        ids = list(set(map(str, item.block_by())))
-        if len(ids) > 0:
-            _id += "%s[" % item.get_id() + "-".join(ids) + "]"
-
-    return _id
-
-
 def get_state_id(train, sim):
     limit = sim.n_state
     n = len(train.solution.sections)

@@ -2,23 +2,21 @@ import logging
 from timetable import Timetable
 from simulator.dispatcher import Dispatcher
 from simulator.event import EnterNodeEvent
-from simulator.event import LeaveNodeEvent
 from simulator.event import EnterStationEvent
-from simulator.event import LeaveStationEvent
 from simulator.event import ReleaseResourceEvent
 from trains.requirement import HaltRequirement
 from simulator.event import humanize_time
 from collections import defaultdict
-from trains.solution import Solution
-from simulator.qtable import QTable, get_state_id, get_state_avoid_id
-import numpy as np
+from simulator.qtable import get_state_id
 from network.dijkstra import dijkstra
 import random
 from trains.connection import WaitingConnection
 
 
 class BlockinException(Exception):
-    pass
+    def __init__(self, train, back_time):
+        self.train = train
+        self.back_time = back_time
 
 
 class Simulator(object):
@@ -28,7 +26,6 @@ class Simulator(object):
         self.trains = list(self.timetable.trains.values())
         self.dispachter = Dispatcher(sim=self)
 
-        self.waiting = set()
         self.events = defaultdict(list)
         self.qtable = qtable
 
@@ -36,6 +33,7 @@ class Simulator(object):
         self.min_time = 9999999
         self.max_time = 0
         self.wait_time = 10.0
+        self.done = False
 
     def create_output(self):
         output = {
@@ -74,10 +72,10 @@ class Simulator(object):
                     occupation.resource.sections.append(section)
 
     def initialize(self):
-        self.waiting = set()
         self.events = defaultdict(list)
         self.assign_sections_to_resources()
 
+        self.done = False
         self.current_time = 0
         self.min_time = 9999999
         self.max_time = 0
@@ -136,7 +134,6 @@ class Simulator(object):
         return score
 
     def run_next(self, event):
-
         if isinstance(event, EnterNodeEvent):
             # Depending on which a section can be picked
             # This is where the dispatcher is used
@@ -161,22 +158,22 @@ class Simulator(object):
             for event in self.events[self.current_time]:
                 self.run_next(event=event)
             self.current_time += 1
-
+        self.done = True
         logging.info("Done %s" % self.compute_score())
 
     def is_late(self, event):
         return event.time > event.node.limit + self.max_delta
 
-    #  section = event.previous_section
-    #  if section is None:
-    #      return False
-    #  t_out = section.entry_time + section.get_minimum_running_time()
-    #  requirement = section.get_requirement()
-    #  if requirement is not None:
-    #      t_out += requirement.get_min_stopping_time()
-    #      t_out = max(requirement.get_exit_earliest(), t_out)
-    #  d = event.time > (t_out + self.max_delta)
-    #  return d
+    #    section = event.previous_section
+    #    if section is None:
+    #        return False
+    #    t_out = section.entry_time + section.get_minimum_running_time()
+    #    requirement = section.get_requirement()
+    #    if requirement is not None:
+    #        t_out += requirement.get_min_stopping_time()
+    #        t_out = max(requirement.get_exit_earliest(), t_out)
+    #    d = event.time > (t_out + self.max_delta)
+    #    return d
 
     def on_node(self, event):
         state = get_state_id(event.train, self)  # self.trains)
@@ -204,20 +201,18 @@ class Simulator(object):
             links = _links
 
         if len(links) == 0:
-            # if self.is_late(event):
-            # self.avoid(event.train.solution.states_to_avoid[-1], event.train.solution.sections[-1].get_id(),
-            #           event.train)
-            #   raise BlockinException()
-
-            # else:
             event.time += self.wait_time
             self.register_event(event)
             return
 
-        link = self.qtable.get_action(links, state)
+        _links = [link for link in links if link.is_free()]
+        link = self.qtable.get_action(_links, state)
 
-        if not link.is_free():
+        if len(_links) == 0 or not link.is_free():
             if self.is_late(event):
+                if len(_links) == 0:
+                    link = random.choice(links)
+
                 _trains = [t for t in link.block_by() if t != event.train]
                 if len(_trains) > 0:
                     self.avoid(event.train, random.choice(_trains), event)
@@ -267,19 +262,29 @@ class Simulator(object):
             {t: t.solution.sections[-1] for t in event.train.other_trains if len(t.solution.sections) > 0})
 
     def avoid(self, train1, train2, event):
+#        # train1 = blocked train
+#        # train2 = blocking train
+#        link1 = train1.solution.sections[-1]
+#        # if other_link in self.qtable.to_avoid[l][t]:
+#        to_avoid = train1.solution.states_to_avoid[-1]
+#        if train2 in to_avoid:
+#            link2 = to_avoid[train2]
+#            self.qtable.to_avoid[link1][train2].append(link2)
+#            logging.info(event)
+#            logging.info("AVOID %s IF %s IS ON  %s " % (link1, train2, link2))
+#            raise BlockinException(train=train1, back_time=link1.entry_time)
+
+
         link2 = train2.solution.sections[-1]
+        # if other_link in self.qtable.to_avoid[l][t]:
         to_avoid = train2.solution.states_to_avoid[-1]
-        if train2 in to_avoid:
+        if train1 in to_avoid:
             link1 = to_avoid[train1]
             self.qtable.to_avoid[link2][train1].append(link1)
-            # ellse:
-            # to_avoid = train2.solution.states_to_avoid[-1]
-            # link1 = to_avoid[train1]
-            # link2 = train2.solution.sections[-1]
-            # self.qtable.to_avoid[link2][train1].append(link1)
-            pass
-        logging.info(event)
-        raise BlockinException()
+            logging.info(event)
+            logging.info("AVOID %s IF %s IS ON  %s " % (link2, train1, link1))
+            raise BlockinException(train=train2, back_time=link2.entry_time)
+
 
     def assign_limit(self):
         for train in self.trains:
@@ -352,3 +357,51 @@ class Simulator(object):
         for train in self.trains:
             if train.get_id() == name:
                 return train
+
+    def go_back(self, time):
+        self.min_time = time
+        self.free_all_resources()
+
+        trains = [train for train in self.trains if not train.solution.done]
+
+        # reset solutions for all trains
+        for train in trains:
+            solution = train.solution
+            _sections = []
+            _states = []
+            for section, state in zip(solution.sections, solution.states):
+                if section.exit_time < time:
+                    _sections.append(section)
+                    _states.append(state)
+
+            train.solution.states = _states
+            train.solution.sections = _sections
+
+        # mark resources as marked if used or will be used in future
+        for train in trains:
+            solution = train.solution
+            if len(solution.sections) == 0:
+                continue
+
+            section = solution.sections[-1]
+            for resource in section.get_resources():
+                resource.block(train)
+
+        i = time+1
+        while i <= self.max_time:
+            for event in self.events[i]:
+                if isinstance(event, EnterStationEvent) or isinstance(event, EnterNodeEvent):
+                    self.events[i].remove(event)
+
+                # it would be wrong to release a resource that is not used!
+                elif isinstance(event, ReleaseResourceEvent):
+                    event.resource.block(event.train)
+            i += 1
+
+        for train in trains:
+            if len(train.solution.sections) == 0:
+                continue
+
+            section = train.solution.sections[-1]
+            self.register_event(
+                EnterNodeEvent(time=section.exit_time, train=train, node=section.end_node, previous_section=section))

@@ -252,8 +252,7 @@ class Simulator(object):
 
         event.train.solution.sections.append(link)
         event.train.solution.states.append(state)
-        event.train.solution.states_to_avoid.append(
-            {t: t.solution.sections[-1] for t in event.train.other_trains if len(t.solution.sections) > 0})
+        event.train.solution.states_to_avoid.append({t: t.solution.sections[-1] for t in event.train.other_trains if len(t.solution.sections) > 0})
 
     def remove_link_to_avoid(self, links, train):
         _links = []

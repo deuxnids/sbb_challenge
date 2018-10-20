@@ -28,6 +28,7 @@ class Section(object):
 
         self.choices = {}
         self.id = "%s#%s" % (self.path._route.get_id(), self.get_number())
+        self.minimum_running_time= isodate.parse_duration(self._data["minimum_running_time"]).seconds
 
     def __repr__(self):
         return "Section(id=%s)" % (self.get_id())
@@ -73,7 +74,7 @@ class Section(object):
     def get_minimum_running_time(self):
         """minimum time (duration) the train must spend on this route_section
         """
-        return isodate.parse_duration(self._data["minimum_running_time"]).seconds
+        return self.minimum_running_time
 
     def get_occupations(self):
         return self.occupations

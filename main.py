@@ -33,7 +33,7 @@ sim.max_delta = 5 * 60
 sim.n_state = 1
 sim.with_connections = True
 
-qtable.epsilon = 0.0
+qtable.epsilon = 0.2
 qtable.alpha = 0.8  # learning rate
 qtable.gamma = 0.8  # discount factor
 trains = list(sim.trains)
@@ -45,9 +45,9 @@ sim.spiegel_anschlusse()
 score = 200
 j = 1
 
-while i < 2:
-    sim.initialize()
-    sim.free_all_resources()
+while i < 5:
+    #sim.initialize()
+    #sim.free_all_resources()
     i+=1
     while not sim.done:
         try:
@@ -56,7 +56,6 @@ while i < 2:
             j += 1
             sim.run()
         except BlockinException as e:
-            logging.info("###########################")
             n = len(sim.trains)
             n2 = len([t for t in sim.trains if t.solution.done])
             #logging.info(e.train)

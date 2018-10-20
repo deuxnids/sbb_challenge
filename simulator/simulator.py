@@ -92,7 +92,7 @@ class Simulator(object):
         for train in self.trains:
             resources[train.get_id()] = set([r.get_id() for s in train.get_sections() for r in s.get_resources()])
 
-        delta = 60*60
+        delta = 60 * 60
         for train in self.trains:
             _trains = []
             start = train.network.nodes["start"].limit
@@ -104,7 +104,7 @@ class Simulator(object):
                     _start = _train.network.nodes["start"].limit
                     _stop = _train.network.nodes["end"].limit
 
-                    if(start -delta <= _stop <= stop + delta) or (_start -delta <= stop <= _stop+delta):
+                    if (start - delta <= _stop <= stop + delta) or (_start - delta <= stop <= _stop + delta):
                         _trains.append(_train)
             train.other_trains = _trains
 
@@ -169,7 +169,7 @@ class Simulator(object):
         logging.info("Done %s" % self.compute_score())
 
     def is_late(self, event):
-        #return event.time > event.node.limit + self.max_delta
+        # return event.time > event.node.limit + self.max_delta
 
         section = event.previous_section
         if section is None:
@@ -196,7 +196,7 @@ class Simulator(object):
         if c_link is not None:
             links = self.remove_link_to_avoid(links, event.train)
 
-        #links = [link for link in links if link.is_free()]
+        # links = [link for link in links if link.is_free()]
 
         if len(links) == 0:
             event.time += self.wait_time
@@ -217,7 +217,7 @@ class Simulator(object):
 
         # can I already enter this link?
         if link.get_requirement() is not None and link.get_requirement().get_entry_earliest() is not None and event.time < link.get_requirement().get_entry_earliest():
-            event = link.get_requirement().get_entry_earliest()
+            event.time = link.get_requirement().get_entry_earliest()
             self.register_event(event)
             assert False
 
@@ -252,13 +252,20 @@ class Simulator(object):
 
         event.train.solution.sections.append(link)
         event.train.solution.states.append(state)
-        event.train.solution.states_to_avoid.append({t: t.solution.sections[-1] for t in event.train.other_trains if len(t.solution.sections) > 0})
+        event.train.solution.states_to_avoid.append(
+            {t: t.solution.sections[-1] for t in event.train.other_trains if len(t.solution.sections) > 0})
 
     def remove_link_to_avoid(self, links, train):
         _links = []
         _trains = [t for t in train.other_trains if len(t.solution.sections) > 0]
+
         for l in links:
             should_keep = True
+
+            if l not in self.qtable.to_avoid:
+                _links.append(l)
+                continue
+
             bb = self.qtable.to_avoid[l]
             for t in bb.keys():
                 if t in _trains:
@@ -272,18 +279,17 @@ class Simulator(object):
         return links
 
     def avoid(self, train1, train2, event):
-#        # train1 = blocked train
-#        # train2 = blocking train
-#        link1 = train1.solution.sections[-1]
-#        # if other_link in self.qtable.to_avoid[l][t]:
-#        to_avoid = train1.solution.states_to_avoid[-1]
-#        if train2 in to_avoid:
-#            link2 = to_avoid[train2]
-#            self.qtable.to_avoid[link1][train2].append(link2)
-#            logging.info(event)
-#            logging.info("AVOID %s IF %s IS ON  %s " % (link1, train2, link2))
-#            raise BlockinException(train=train1, back_time=link1.entry_time)
-
+        #        # train1 = blocked train
+        #        # train2 = blocking train
+        #        link1 = train1.solution.sections[-1]
+        #        # if other_link in self.qtable.to_avoid[l][t]:
+        #        to_avoid = train1.solution.states_to_avoid[-1]
+        #        if train2 in to_avoid:
+        #            link2 = to_avoid[train2]
+        #            self.qtable.to_avoid[link1][train2].append(link2)
+        #            logging.info(event)
+        #            logging.info("AVOID %s IF %s IS ON  %s " % (link1, train2, link2))
+        #            raise BlockinException(train=train1, back_time=link1.entry_time)
 
         link2 = train2.solution.sections[-1]
         # if other_link in self.qtable.to_avoid[l][t]:
@@ -291,10 +297,12 @@ class Simulator(object):
         if train1 in to_avoid:
             link1 = to_avoid[train1]
             self.qtable.to_avoid[link2][train1].append(link1)
-            logging.info(event)
-            logging.info("AVOID %s IF %s IS ON  %s " % (link2, train1, link1))
+            # logging.info(event)
+            n1, n2 = len(self.trains), len([t for t in self.trains if t.solution.done])
+            logging.info(
+                "%s (%i/%i) AVOID %s IF %s IS ON %s going back to %s " % (
+                humanize_time(event.time), n2, n1, link2, train1, link1, humanize_time(link2.entry_time)))
             raise BlockinException(train=train2, back_time=link2.entry_time)
-
 
     def assign_limit(self):
         for train in self.trains:
@@ -397,19 +405,21 @@ class Simulator(object):
             for resource in section.get_resources():
                 resource.block(train)
 
-        i = time+1
-        while i <= self.max_time:
-            for event in self.events[i]:
-                if isinstance(event, EnterStationEvent) or isinstance(event, EnterNodeEvent):
-                    self.events[i].remove(event)
-
+        events = self.events
+        self.events = defaultdict(list)
+        times = [i for i in sorted(events.keys()) if i >= time]
+        for i in times:
+            for event in events:
                 # it would be wrong to release a resource that is not used!
-                elif isinstance(event, ReleaseResourceEvent):
-                    event.resource.block(event.train)
-            i += 1
-
+                if isinstance(event, ReleaseResourceEvent):
+                    if event.emited_at < time:
+                        self.events[i].append(event)
+                        event.resource.block(event.train)
         for train in trains:
             if len(train.solution.sections) == 0:
+                event = train.get_start_event()
+                self.register_event(event)
+
                 continue
 
             section = train.solution.sections[-1]

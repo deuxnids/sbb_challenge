@@ -299,10 +299,11 @@ class Simulator(object):
             self.qtable.to_avoid[link2][train1].append(link1)
             # logging.info(event)
             n1, n2 = len(self.trains), len([t for t in self.trains if t.solution.done])
+            back_time = link2.entry_time
             logging.info(
                 "%s (%i/%i) AVOID %s IF %s IS ON %s going back to %s " % (
-                humanize_time(event.time), n2, n1, link2, train1, link1, humanize_time(link2.entry_time)))
-            raise BlockinException(train=train2, back_time=link2.entry_time)
+                    humanize_time(event.time), n2, n1, link2, train1, link1, humanize_time(back_time)))
+            raise BlockinException(train=train2, back_time=back_time)
 
     def assign_limit(self):
         for train in self.trains:
@@ -380,6 +381,7 @@ class Simulator(object):
         self.min_time = time
         self.free_all_resources()
 
+        trains_done = [train for train in self.trains if train.solution.done]
         trains = [train for train in self.trains if not train.solution.done]
 
         # reset solutions for all trains
@@ -387,41 +389,54 @@ class Simulator(object):
             solution = train.solution
             _sections = []
             _states = []
-            for section, state in zip(solution.sections, solution.states):
+            _to_avoid = []
+            for section, state, to_avoid in zip(solution.sections, solution.states, solution.states_to_avoid):
                 if section.exit_time < time:
                     _sections.append(section)
                     _states.append(state)
+                    _to_avoid.append(to_avoid)
 
-            train.solution.states = _states
-            train.solution.sections = _sections
+            solution.sections = _sections
+            solution.states = _states
+            solution.states_to_avoid = _to_avoid
 
-        # mark resources as marked if used or will be used in future
-        for train in trains:
-            solution = train.solution
-            if len(solution.sections) == 0:
-                continue
-
-            section = solution.sections[-1]
-            for resource in section.get_resources():
-                resource.block(train)
-
-        events = self.events
         self.events = defaultdict(list)
-        times = [i for i in sorted(events.keys()) if i >= time]
-        for i in times:
-            for event in events:
-                # it would be wrong to release a resource that is not used!
-                if isinstance(event, ReleaseResourceEvent):
-                    if event.emited_at < time:
-                        self.events[i].append(event)
-                        event.resource.block(event.train)
+
+        for train in trains_done:
+            section = train.solution.sections[-1]
+            for r in section.get_resources():
+                release_at = section.exit_time + r.get_release_time()
+                if release_at >= time:
+                    next_event = ReleaseResourceEvent(train=train, time=release_at, emited_at=section.exit_time,
+                                                      resource=r)
+                    self.register_event(next_event)
+                    r.block(train)
+
         for train in trains:
+            if len(train.solution.sections) > 0:
+                for r in train.solution.sections[-1].get_resources():
+                    r.block(train)
+
+            for section in train.solution.sections[:-1]:
+                for r in section.get_resources():
+                    release_at = section.exit_time + r.get_release_time()
+                    if release_at >= time:
+                        next_event = ReleaseResourceEvent(train=train, time=release_at, emited_at=section.exit_time,
+                                                          resource=r)
+                        self.register_event(next_event)
+                        r.block(train)
+
+        for train in trains:
+
+            #train.solution.states = train.solution.states[:-1]
+            #train.solution.sections = train.solution.sections[:-1]
+            #train.solution.states_to_avoid = train.solution.states_to_avoid[:-1]
+
             if len(train.solution.sections) == 0:
                 event = train.get_start_event()
                 self.register_event(event)
 
-                continue
-
-            section = train.solution.sections[-1]
-            self.register_event(
-                EnterNodeEvent(time=section.exit_time, train=train, node=section.end_node, previous_section=section))
+            else:
+                section = train.solution.sections[-1]
+                self.register_event(EnterNodeEvent(time=section.exit_time, train=train, node=section.end_node,
+                                                   previous_section=section))

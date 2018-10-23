@@ -26,3 +26,6 @@ class WaitingConnection(object):
         self.from_train = from_train
         self.from_section_marker = from_section_marker
         self.min_connection_time = min_time
+
+    def __str__(self):
+        return "%s %s" % self.from_section_marker, self.min_connection_time

@@ -6,7 +6,7 @@ import logging
 
 class QTable(object):
     def __init__(self):
-        self.q_values = defaultdict(lambda: defaultdict(lambda: random.randint(-2, 2)))
+        self.q_values = defaultdict(lambda: defaultdict(lambda: 0))
 
         self.epsilon = 0.9
         self.alpha = 0.1

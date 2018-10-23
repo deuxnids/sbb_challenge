@@ -19,7 +19,7 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-no = "07"
+no = "06"
 path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/"+no+"*")[0]
 
 qtable = QTable()
@@ -53,7 +53,7 @@ logging.info("proble %s" % path)
 logging.info("with backward %s" % sim.backward)
 j = 1
 
-while i < 100:
+while i < 5:
     sim.initialize()
     sim.free_all_resources()
     i += 1

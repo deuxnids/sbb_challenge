@@ -163,7 +163,7 @@ class Simulator(object):
     def run(self):
         self.current_time = self.min_time
         while self.current_time < self.max_time + 10:
-            if self.current_time > 60*60*25:
+            if self.current_time > 60 * 60 * 25:
                 break
             for event in self.events[self.current_time]:
                 self.run_next(event=event)
@@ -299,7 +299,8 @@ class Simulator(object):
         to_avoid = train2.solution.states_to_avoid[-1]
         if train1 in to_avoid:
             link1 = to_avoid[train1]
-            assert link1 not in self.qtable.to_avoid[link2][train1]
+            if link1 in self.qtable.to_avoid[link2][train1]:
+                return
             self.qtable.to_avoid[link2][train1].append(link1)
             # logging.info(event)
             back_time = link1.entry_time
@@ -308,7 +309,7 @@ class Simulator(object):
             logging.info(
                 "%s (%i/%i) AVOID %s IF %s IS ON %s going back to %s " % (
                     humanize_time(event.time), n2, n1, link2, train1, link1, humanize_time(back_time)))
-            raise BlockinException(train=train2, back_time=back_time-60*60)
+            raise BlockinException(train=train2, back_time=back_time)
 
     def assign_limit(self):
         for train in self.trains:
@@ -409,9 +410,9 @@ class Simulator(object):
                     _states.append(state)
                     _to_avoid.append(to_avoid)
 
-                else:
-                    section.entry_time = np.inf
-                    section.exit_time = np.inf
+               # else:
+               #     section.entry_time = np.inf
+               #     section.exit_time = np.inf
 
             n = len(_sections)
             for i, section in enumerate(_sections):
@@ -426,10 +427,11 @@ class Simulator(object):
                     assert section.exit_time != np.inf
                     release_at = section.exit_time + r.get_release_time()
                     if release_at > time:
-                        next_event = ReleaseResourceEvent(train=train, time=release_at, emited_at=section.exit_time,
-                                                          resource=r)
-                        self.register_event(next_event)
-                    r.free = False
+                        if len(section.end_node.out_links) == 0 or i < n-1:
+                            next_event = ReleaseResourceEvent(train=train, time=release_at, emited_at=section.exit_time,
+                                                              resource=r)
+                            self.register_event(next_event)
+                            r.free = False
 
             if len(_sections) > 0:
                 section = _sections[-1]

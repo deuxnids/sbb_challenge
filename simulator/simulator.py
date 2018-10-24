@@ -362,17 +362,20 @@ class Simulator(object):
             to_r.block(train=to_section.train)
 
         if to_section is not None:
-            # register next event: EnterNode or EnterStation
-            requirement = to_section.get_requirement()
-            next_time = to_section.get_minimum_running_time() + at
-            if isinstance(requirement, HaltRequirement):
-                earliest_entry = to_section.get_requirement().get_entry_earliest()
-                # this test should be done before
-                time = max(earliest_entry, next_time)
-                self.register_event(EnterStationEvent(time=time, section=to_section, train=to_section.train))
-            else:
-                self.register_event(EnterNodeEvent(time=next_time, train=to_section.train, node=to_section.end_node,
-                                                   previous_section=to_section))
+            self.next_event_for_train(to_section=to_section, at=at)
+
+    def next_event_for_train(self, to_section, at):
+        # register next event: EnterNode or EnterStation
+        requirement = to_section.get_requirement()
+        next_time = to_section.get_minimum_running_time() + at
+        if isinstance(requirement, HaltRequirement):
+            earliest_entry = to_section.get_requirement().get_entry_earliest()
+            # this test should be done before
+            time = max(earliest_entry, next_time)
+            self.register_event(EnterStationEvent(time=time, section=to_section, train=to_section.train))
+        else:
+            self.register_event(EnterNodeEvent(time=next_time, train=to_section.train, node=to_section.end_node,
+                                               previous_section=to_section))
 
     def release_resources(self, resource, emited_at):
         resource.release(release_time=emited_at)
@@ -405,14 +408,14 @@ class Simulator(object):
             _to_avoid = []
 
             for section, state, to_avoid in zip(solution.sections, solution.states, solution.states_to_avoid):
-                if section.exit_time < time:  # or section.exit_time == np.inf:
+                if section.entry_time <= time:  # or section.exit_time == np.inf:
                     _sections.append(section)
                     _states.append(state)
                     _to_avoid.append(to_avoid)
 
-               # else:
-               #     section.entry_time = np.inf
-               #     section.exit_time = np.inf
+                else:
+                    section.entry_time = np.inf
+                    section.exit_time = np.inf
 
             n = len(_sections)
             for i, section in enumerate(_sections):
@@ -424,23 +427,25 @@ class Simulator(object):
                                          r not in next_section.get_resources()]
 
                 for r in section_resources:
-                    assert section.exit_time != np.inf
-                    release_at = section.exit_time + r.get_release_time()
-                    if release_at > time:
-                        if len(section.end_node.out_links) == 0 or i < n-1:
-                            next_event = ReleaseResourceEvent(train=train, time=release_at+10, emited_at=section.exit_time,
+                    if section.exit_time < np.inf:
+                        assert section.exit_time != np.inf
+                        release_at = section.exit_time + r.get_release_time()
+                        if release_at >= time:
+                            next_event = ReleaseResourceEvent(train=train, time=release_at, emited_at=section.exit_time,
                                                               resource=r)
                             self.register_event(next_event)
                             r.free = False
 
             if len(_sections) > 0:
-                section = _sections[-1]
-                if len(section.end_node.out_links) > 0:
-                    self.register_event(EnterNodeEvent(time=section.exit_time, train=train, node=section.end_node,
-                                                       previous_section=section))
-                    section.exit_time = np.inf
-                    for r in section.get_resources():
+                last_section = _sections[-1]
+
+                # exit_time is either undefined or after time
+                if last_section.exit_time > time:
+                    last_section.exit_time = np.inf
+                    self.next_event_for_train(to_section=last_section, at=last_section.entry_time)
+                    for r in last_section.get_resources():
                         r.block(train)
+
             else:
                 event = train.get_start_event()
                 self.register_event(event)

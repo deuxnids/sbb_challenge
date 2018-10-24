@@ -19,7 +19,7 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-no = "05"
+no = "06"
 path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/"+no+"*")[0]
 
 qtable = QTable()
@@ -30,7 +30,18 @@ sim.assign_limit()
 
 i = 1
 
-#with backward wait_time needs to be set on 1. Why? No idea...
+"""
+1:
+2:
+3:
+4:
+5:
+6: backward, mulit ->523, 499, 412, 456, 410, 387 (wait_time=30)
+7:
+8:
+9: 
+"""
+
 sim.wait_time = 30
 sim.max_delta = 15 * 60
 sim.n_state = 0

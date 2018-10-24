@@ -303,7 +303,7 @@ class Simulator(object):
                 return
             self.qtable.to_avoid[link2][train1].append(link1)
             # logging.info(event)
-            back_time = link1.entry_time
+            back_time = link2.entry_time
 
             n1, n2 = len(self.trains), len([t for t in self.trains if t.solution.done])
             logging.info(
@@ -428,7 +428,7 @@ class Simulator(object):
                     release_at = section.exit_time + r.get_release_time()
                     if release_at > time:
                         if len(section.end_node.out_links) == 0 or i < n-1:
-                            next_event = ReleaseResourceEvent(train=train, time=release_at, emited_at=section.exit_time,
+                            next_event = ReleaseResourceEvent(train=train, time=release_at+10, emited_at=section.exit_time,
                                                               resource=r)
                             self.register_event(next_event)
                             r.free = False

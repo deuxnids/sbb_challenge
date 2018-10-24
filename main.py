@@ -19,7 +19,7 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-no = "06"
+no = "05"
 path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/"+no+"*")[0]
 
 qtable = QTable()
@@ -30,13 +30,14 @@ sim.assign_limit()
 
 i = 1
 
+#with backward wait_time needs to be set on 1. Why? No idea...
 sim.wait_time = 30
 sim.max_delta = 15 * 60
 sim.n_state = 0
 sim.with_connections = True
 sim.backward = True
 
-qtable.epsilon = 0.0
+qtable.epsilon = 0.2
 qtable.alpha = 0.8  # learning rate
 qtable.gamma = 0.8  # discount factor
 
@@ -53,7 +54,7 @@ logging.info("proble %s" % path)
 logging.info("with backward %s" % sim.backward)
 j = 1
 
-while i < 5:
+while i < 2:
     sim.initialize()
     sim.free_all_resources()
     i += 1
@@ -69,8 +70,7 @@ while i < 5:
             # logging.info("%s: %i/%i trains" % (humanize_time(sim.current_time), n2, n))
             if sim.backward:
                 sim.go_back(e.back_time)
-    if sim.compute_score() < 500:
-        break
+    sim.backward = True
 
 folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"
 output_path = os.path.join(folder, sim.timetable.label + "_for_submission.json")

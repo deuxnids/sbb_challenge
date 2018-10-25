@@ -37,19 +37,18 @@ class Resource(object):
         if self.free:
             return True
 
-        elif self.currently_used_by is None:
-            return False
-
-        elif train == self.currently_used_by:
+        if self.currently_used_by is not None and train == self.currently_used_by:
             return True
 
         return False
 
     def block(self, train):
-        assert self.currently_used_by is None or self.currently_used_by == train, "%s %s <-> %s" % (self, train, self.currently_used_by)
+        assert self.currently_used_by is None or self.currently_used_by == train, "%s %s <-> %s" % (
+        self, train, self.currently_used_by)
         self.free = False
         self.currently_used_by = train
 
     def release(self, release_time):
+        assert self.currently_used_by is None, self
         if self.currently_used_by is None:
             self.free = True

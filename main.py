@@ -20,7 +20,8 @@ FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
 no = "06"
-path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/"+no+"*")[0]
+path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/" + no + "*")[
+    0]
 
 qtable = QTable()
 
@@ -52,7 +53,6 @@ qtable.epsilon = 0.2
 qtable.alpha = 0.8  # learning rate
 qtable.gamma = 0.8  # discount factor
 
-
 sim.initialize()
 sim.assign_sections_to_resources()
 sim.match_trains()
@@ -61,10 +61,10 @@ sim.spiegel_anschlusse()
 score = 200
 random.seed(2018)
 
-logging.info("proble %s" % path)
+logging.info("problem %s" % path)
 logging.info("with backward %s" % sim.backward)
 j = 1
-
+kk = 1
 while i < 2:
     sim.initialize()
     sim.free_all_resources()
@@ -74,9 +74,10 @@ while i < 2:
             if not sim.backward:
                 sim.initialize()
                 sim.free_all_resources()
-            j+=1
+            j += 1
             sim.run()
         except BlockinException as e:
+
             n, n2 = len(sim.trains), len([t for t in sim.trains if t.solution.done])
             # logging.info("%s: %i/%i trains" % (humanize_time(sim.current_time), n2, n))
             if sim.backward:

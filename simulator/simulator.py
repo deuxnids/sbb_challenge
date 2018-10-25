@@ -164,6 +164,7 @@ class Simulator(object):
         self.current_time = self.min_time
         while self.current_time < self.max_time + 10:
             if self.current_time > 60 * 60 * 25:
+                logging.info("breaking")
                 break
             for event in self.events[self.current_time]:
                 self.run_next(event=event)
@@ -303,7 +304,7 @@ class Simulator(object):
                 return
             self.qtable.to_avoid[link2][train1].append(link1)
             # logging.info(event)
-            back_time = link2.entry_time
+            back_time = link1.entry_time
 
             n1, n2 = len(self.trains), len([t for t in self.trains if t.solution.done])
             logging.info(
@@ -336,10 +337,7 @@ class Simulator(object):
             self.qtable.update_table(p_state, current_state=state, previous_action=last_action, reward=reward)
 
     def go_to_section(self, from_section, to_section, at):
-        if to_section is not None and from_section is not None and from_section.train.get_id() in ["11", "20419"]:
-            logging.info("%s: %s->%s" % (humanize_time(at), from_section, to_section))
         # logging.info("%s->%s" % (from_section, to_section))
-
         to_resources = []
 
         if to_section is not None:
@@ -352,7 +350,7 @@ class Simulator(object):
             for from_r in from_section.get_resources():
                 if from_r not in to_resources:
                     from_r.currently_used_by = None
-                    from_r.last_exit_time = at
+                    # from_r.last_exit_time = at
                     next_event = ReleaseResourceEvent(train=from_section.train, time=at + from_r.get_release_time(),
                                                       emited_at=at, resource=from_r)
                     self.register_event(next_event)
@@ -362,7 +360,7 @@ class Simulator(object):
             to_r.block(train=to_section.train)
 
         if to_section is not None:
-            self.next_event_for_train(to_section=to_section, at=at)
+            self.register_event(self.next_event_for_train(to_section=to_section, at=at))
 
     def next_event_for_train(self, to_section, at):
         # register next event: EnterNode or EnterStation
@@ -372,16 +370,18 @@ class Simulator(object):
             earliest_entry = to_section.get_requirement().get_entry_earliest()
             # this test should be done before
             time = max(earliest_entry, next_time)
-            self.register_event(EnterStationEvent(time=time, section=to_section, train=to_section.train))
+            return EnterStationEvent(time=time, section=to_section, train=to_section.train)
         else:
-            self.register_event(EnterNodeEvent(time=next_time, train=to_section.train, node=to_section.end_node,
-                                               previous_section=to_section))
+            return EnterNodeEvent(time=next_time, train=to_section.train, node=to_section.end_node,
+                                  previous_section=to_section)
 
     def release_resources(self, resource, emited_at):
         resource.release(release_time=emited_at)
 
     def register_event(self, event):
         assert event.time != np.inf
+        event.time = max(event.time, self.current_time + 1)
+        assert self.current_time < event.time, "current time = %s, event.time = %s " % (humanize_time(self.current_time), humanize_time(event.time))
         self.min_time = min(self.min_time, event.time)
         self.max_time = max(self.max_time, event.time)
         self.events[event.time].append(event)
@@ -398,6 +398,7 @@ class Simulator(object):
         self.free_all_resources()
 
         self.events = defaultdict(list)
+        self.current_time = time
 
         # reset solutions for all trains
         for train in self.trains:
@@ -419,18 +420,25 @@ class Simulator(object):
 
             n = len(_sections)
             for i, section in enumerate(_sections):
+                is_at_the_end = len(section.end_node.out_links) == 0
+                if not is_at_the_end and i == n - 1:
+                    continue
 
-                section_resources = section.get_resources()
-                if i + 1 < n:
+                if is_at_the_end and section.exit_time >= time:
+                    # do not release
+                    continue
+
+                resources = section.get_resources()
+                if i < n - 1:
                     next_section = _sections[i + 1]
-                    section_resources = [r for r in section.get_resources() if
-                                         r not in next_section.get_resources()]
+                    next_resources = next_section.get_resources()
+                    resources = [r for r in resources if r not in next_resources]
 
-                for r in section_resources:
+                for r in resources:
                     if section.exit_time < np.inf:
                         assert section.exit_time != np.inf
                         release_at = section.exit_time + r.get_release_time()
-                        if release_at >= time:
+                        if release_at > time:
                             next_event = ReleaseResourceEvent(train=train, time=release_at, emited_at=section.exit_time,
                                                               resource=r)
                             self.register_event(next_event)
@@ -440,9 +448,11 @@ class Simulator(object):
                 last_section = _sections[-1]
 
                 # exit_time is either undefined or after time
-                if last_section.exit_time > time:
+                if last_section.exit_time >= time:
                     last_section.exit_time = np.inf
-                    self.next_event_for_train(to_section=last_section, at=last_section.entry_time)
+                    event = self.next_event_for_train(to_section=last_section, at=last_section.entry_time)
+                    event.time = max(time, event.time)
+                    self.register_event(event)
                     for r in last_section.get_resources():
                         r.block(train)
 

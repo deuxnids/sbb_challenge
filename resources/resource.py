@@ -8,9 +8,9 @@ class Resource(object):
         self.sections = []
 
         self.free = True
+        self.last_used_by = None
         self.last_exit_time = None
         self.currently_used_by = None
-        self.blocks = []
 
     def get_id(self):
         return self.id
@@ -37,18 +37,31 @@ class Resource(object):
         if self.free:
             return True
 
-        if self.currently_used_by is not None and train == self.currently_used_by:
+        if train == self.last_used_by:
             return True
 
         return False
 
-    def block(self, train):
-        assert self.currently_used_by is None or self.currently_used_by == train, "%s %s <-> %s" % (
-        self, train, self.currently_used_by)
+    def enter(self, train, at):
+        assert self.currently_used_by is None or self.currently_used_by == train
+
         self.free = False
         self.currently_used_by = train
+        self.last_used_by = train
 
-    def release(self, release_time):
-        assert self.currently_used_by is None, self
-        if self.currently_used_by is None:
-            self.free = True
+    def exit(self, train, at):
+        assert self.free is False
+        assert self.last_used_by == train
+
+        self.currently_used_by = None
+        self.last_exit_time = at
+
+    def release(self, train, release_time):
+        assert self.free is False
+        assert self.currently_used_by is None
+        assert train == self.last_used_by
+
+        self.free = True
+
+    def __hash__(self):
+        return hash(self.get_id())

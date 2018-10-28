@@ -40,7 +40,7 @@ class Network(object):
                               str(route_path["route_sections"][index_in_path + 1]["sequence_number"])) + ")"
 
     def get_first_node(self):
-        return self.nodes["depot"]
+        return self.nodes["start"]
 
     def add_route(self, route):
         for path in route.get_paths().values():
@@ -67,6 +67,7 @@ class Network(object):
                 start_node.out_links.append(section)
 
                 self.sections[section.get_number()] = section
+
         for node_id in self.nodes:
             node = self.nodes[node_id]
             if len(node.in_links) == 0:
@@ -90,9 +91,7 @@ class Network(object):
         section.occupations = []
         section.marker = "depot"
         section.end_node = end_node
+
         start_node.out_links.append(section)
         self.nodes["depot"] = start_node
         self.sections[section.get_number()] = section
-
-        for section in self.sections.values():
-            section.init_weights()

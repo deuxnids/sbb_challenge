@@ -1,10 +1,7 @@
 import isodate
-import numpy as np
-import logging
 from simulator.event import humanize_time
 
 from trains.connection import Connection
-
 
 """
 {'sequence_number': 1, 'section_marker': 'A', 'type': 'start', 'entry_earliest': '08:20:00', 'entry_delay_weight': 1,                              'exit_delay_weight': 1, 'connections': None}
@@ -19,12 +16,11 @@ class Requirement(object):
         self._data = data
         self.train = train
         self.waiting_connections = []
-        self.min_stopping_time= 0.0
+        self.min_stopping_time = 0.0
 
         key = "min_stopping_time"
         if key in self._data:
-            self.min_stopping_time =  isodate.parse_duration(self._data["min_stopping_time"]).seconds
-
+            self.min_stopping_time = isodate.parse_duration(self._data["min_stopping_time"]).seconds
 
     @staticmethod
     def factory(data, **kwargs):
@@ -68,13 +64,13 @@ class Requirement(object):
         key = "entry_latest"
         if key in self._data:
             return to_sec(self._data[key])
-        return 24*60*60*3
+        return 24 * 60 * 60 * 3
 
     def get_exit_latest(self):
         key = "exit_latest"
         if key in self._data:
             return to_sec(self._data[key])
-        return 24*60*60*3
+        return 24 * 60 * 60 * 3
 
     def get_connections(self):
         if "connections" not in self._data:
@@ -97,11 +93,10 @@ class Requirement(object):
 
     def __str__(self):
         return "Halt:  %s<->%s (%s) %s<->%s" % (humanize_time(self.get_entry_earliest()),
-                                            humanize_time(self.get_entry_latest()),
-                                            humanize_time(self.get_min_stopping_time()),
-                                            humanize_time(self.get_exit_earliest()),
-                                            humanize_time(self.get_exit_latest()))
-
+                                                humanize_time(self.get_entry_latest()),
+                                                humanize_time(self.get_min_stopping_time()),
+                                                humanize_time(self.get_exit_earliest()),
+                                                humanize_time(self.get_exit_latest()))
 
 
 class StartRequirement(Requirement):
@@ -121,4 +116,4 @@ class EndeRequirement(Requirement):
 
 def to_sec(txt):
     a = txt.split(":")
-    return int(a[0])*60*60 + int(a[1])*60 + int(a[2])
+    return int(a[0]) * 60 * 60 + int(a[1]) * 60 + int(a[2])

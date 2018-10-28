@@ -10,7 +10,7 @@ class Train(object):
     def __init__(self, data):
         self._data = data
         self.network = Network()
-        self.solution = Solution(train=self)
+        self.solution = None
         self.requirements = None
         self.id = self._data["id"]
         self.hash = hash(self.get_id())
@@ -54,7 +54,7 @@ class Train(object):
 
     def get_start_event(self):
         requirement = self.get_requirements()[0]
-        return EnterNodeEvent(train=self, node=self.get_first_node(), time=requirement.get_entry_earliest() - 1,
+        return EnterNodeEvent(train=self, node=self.get_first_node(), time=requirement.get_entry_earliest(),
                               previous_section=None)
 
     def get_first_node(self):

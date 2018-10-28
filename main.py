@@ -19,7 +19,7 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-no = "06"
+no = "01"
 path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/" + no + "*")[
     0]
 
@@ -43,13 +43,16 @@ i = 1
 9: 
 """
 
-sim.wait_time = 30
+sim.wait_time = 1
 sim.max_delta = 15 * 60
 sim.n_state = 0
+
+# dijkstra or ..
+sim.late_on_node = False
 sim.with_connections = True
 sim.backward = True
 
-qtable.epsilon = 0.2
+qtable.epsilon = 0.1
 qtable.alpha = 0.8  # learning rate
 qtable.gamma = 0.8  # discount factor
 
@@ -82,7 +85,6 @@ while i < 2:
             # logging.info("%s: %i/%i trains" % (humanize_time(sim.current_time), n2, n))
             if sim.backward:
                 sim.go_back(e.back_time)
-    sim.backward = True
 
 folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"
 output_path = os.path.join(folder, sim.timetable.label + "_for_submission.json")

@@ -2,7 +2,6 @@ import isodate
 from routes.occupation import Occupation
 
 MAX_TIME = 24 * 60 * 60
-import numpy as np
 
 
 class Section(object):
@@ -10,12 +9,13 @@ class Section(object):
         self._data = data
         self.path = path
         self.train = path._route.train
-        self.entry_time = np.inf
-        self.exit_time = np.inf
+
         self.start_node = None
         self.end_node = None
+
         self.occupations = [Occupation(data=d, section=self) for d in self._data["resource_occupations"]]
         self.marker = None
+
         if "section_marker" in self._data:
             markers = self._data["section_marker"]
             if len(markers) > 0:
@@ -26,12 +26,11 @@ class Section(object):
         if len(requirements) > 0:
             self.requirement = requirements[0]
 
-        self.choices = {}
         self.id = "%s#%s" % (self.path._route.get_id(), self.get_number())
         self.minimum_running_time= isodate.parse_duration(self._data["minimum_running_time"]).seconds
 
     def __repr__(self):
-        return "Section(id=%s)" % (self.get_id())
+        return "%s" % (self.get_id())
 
     def get_id(self):
         return self.id
@@ -105,28 +104,6 @@ class Section(object):
                 return False
         return True
 
-    def init_weights(self):
-        links = list(self.end_node.out_links)
-        self.choices = {}
-        for link in links:
-            self.choices[link] = 1.0
-
-        self.choices[None] = 0.0
-
-    def calc_penalty(self):
-        value = 0.0
-
-        requirement = self.get_requirement()
-        if requirement is not None:
-            v = requirement.get_entry_delay_weight() * max(0, self.entry_time - requirement.get_entry_latest())
-            value += v
-            v = requirement.get_exit_delay_weight() * max(0, self.exit_time - requirement.get_exit_latest())
-            value += v
-
-        value = 1 / 60.0 * value
-        value += self.get_penalty()
-
-        return value
 
     def block_by(self):
         blocking_trains = []

@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class Event(object):
     def __init__(self, time, train):
         self.time = time
@@ -85,6 +88,8 @@ class ReleaseResourceEvent(Event):
 
 
 def humanize_time(secs):
+    if np.isinf(secs):
+        return "xxx"
     if secs is None:
         return ""
     mins, secs = divmod(secs, 60)

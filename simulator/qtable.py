@@ -12,10 +12,7 @@ class QTable(object):
         self.alpha = 0.1
         self.gamma = 0.6
 
-        self.to_avoid = defaultdict(lambda: defaultdict(list))
-
-    def add_avoid(self, state, action):
-        self.to_avoid[state].add(action)
+        self.to_avoid = defaultdict(list)
 
     def remove(self, state, action):
         if state in self.q_values:
@@ -46,15 +43,35 @@ class QTable(object):
         new_value = (1 - self.alpha) * previous_value + self.alpha * (reward + self.gamma * next_max)
         self.q_values[previous_state][previous_action.get_id()] = new_value
 
+    def do_not_go(self, on, if_on):
+        #if on not in self.to_avoid:
+        #    return False
 
-def get_state_id(train, sim):
-    limit = sim.n_state
+        if if_on in self.to_avoid[on]:
+            logging.info("%s should already by avoided" % on)
+            return
+
+        self.to_avoid[on].append(if_on)
+
+    def can_go(self, on, if_are_on):
+        if on not in self.to_avoid:
+            return True
+
+        for if_is_on in if_are_on:
+            if if_is_on in self.to_avoid[on]:
+                return False
+
+        return True
+
+
+def get_state_id(train, limit):
+    return "ass"
     n = len(train.solution.sections)
     if n == 0:
         return "start_%s" % train
     else:
         s = train.solution.sections[-1]
-    flat_list = list(set([item for sublist in train.compute_routes(s.end_node, limit=limit) for item in sublist]))
+    flat_list = list(set([item for sublist in train.compute_routes(s.get_end_node(), limit=limit) for item in sublist]))
     flat_list = sorted(flat_list, key=lambda x: x.get_id())
 
     _id = "%s_%s->" % (train, s.get_id())

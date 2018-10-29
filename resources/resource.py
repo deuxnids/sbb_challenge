@@ -12,6 +12,8 @@ class Resource(object):
         self.last_exit_time = None
         self.currently_used_by = None
 
+        self.release_time = isodate.parse_duration(self._data["release_time"]).seconds
+
     def get_id(self):
         return self.id
 
@@ -22,7 +24,7 @@ class Resource(object):
         """
         describes how much time must pass between release of a resource by one train and the following occupation by the next train. See Business Rules for details.
         """
-        return isodate.parse_duration(self._data["release_time"]).seconds
+        return self.release_time
 
     def get_following_allowed(self):
         """flag whether the resource is of following type (true) or of blocking type (false).

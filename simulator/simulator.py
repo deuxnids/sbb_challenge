@@ -224,7 +224,7 @@ class Simulator(object):
         self.go_to_section(from_section=section, to_section=to_section, at=event.time)
 
         train.solution.save_states(section=to_section, state=state)
-        # self.update(train=event.train, state=state, time=event.time)
+        self.update(train=event.train, state=state, time=event.time)
 
     def if_at_end(self, section, event):
         if event.node.label == "end":
@@ -316,11 +316,11 @@ class Simulator(object):
                 n.limit = r.get_exit_latest() - (distances["end"] - distances[n.label])
 
     def free_all_resources(self):
-        for train in self.trains:
-            for s in train.network.sections.values():
-                for r in s.get_resources():
-                    r.free = True
-                    r.currently_used_by = None
+        for r in self.resources.values():
+            r.free = True
+            r.currently_used_by = None
+            r.last_exit_time = None
+            r.last_used_by = None
 
     def update(self, train, state, time):
         if len(train.solution.sections) > 1:

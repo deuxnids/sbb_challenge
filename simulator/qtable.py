@@ -65,7 +65,6 @@ class QTable(object):
 
 
 def get_state_id(train, limit):
-    return "ass"
     n = len(train.solution.sections)
     if n == 0:
         return "start_%s" % train

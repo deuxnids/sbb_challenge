@@ -12,6 +12,7 @@ from simulator.simulator import Simulator
 from simulator.simulator import BlockinException
 from simulator.qtable import QTable
 from simulator.event import humanize_time
+import numpy as np
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -19,7 +20,7 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-no = "01"
+no = "05"
 path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/" + no + "*")[
     0]
 
@@ -43,8 +44,8 @@ i = 1
 9: 
 """
 
-sim.wait_time = 1
-sim.max_delta = 15 * 60
+sim.wait_time = 60
+sim.max_delta = 10 * 60
 sim.n_state = 0
 
 # dijkstra or ..
@@ -52,7 +53,7 @@ sim.late_on_node = False
 sim.with_connections = True
 sim.backward = True
 
-qtable.epsilon = 0.1
+qtable.epsilon = 0.2
 qtable.alpha = 0.8  # learning rate
 qtable.gamma = 0.8  # discount factor
 
@@ -61,18 +62,19 @@ sim.assign_sections_to_resources()
 sim.match_trains()
 sim.spiegel_anschlusse()
 
-score = 200
+score = 800
 random.seed(2018)
 
 logging.info("problem %s" % path)
 logging.info("with backward %s" % sim.backward)
-j = 1
 kk = 1
-while i < 2:
+sub_tour = 100000
+while i < 200:
     sim.initialize()
     sim.free_all_resources()
     i += 1
-    while not sim.done:
+    j = 1
+    while not sim.done and j < sub_tour:
         try:
             if not sim.backward:
                 sim.initialize()
@@ -85,6 +87,10 @@ while i < 2:
             # logging.info("%s: %i/%i trains" % (humanize_time(sim.current_time), n2, n))
             if sim.backward:
                 sim.go_back(e.back_time)
+    if j == sub_tour:
+        logging.info("resetting")
+    if sim.compute_score() < score:
+        break
 
 folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"
 output_path = os.path.join(folder, sim.timetable.label + "_for_submission.json")

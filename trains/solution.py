@@ -70,7 +70,7 @@ class Solution(object):
         self.done = False
 
         self.sections = [c_section]
-        self.other_trains_sections = [None]
+        self.other_trains_sections = [{}]
 
         self.states = [None]
 

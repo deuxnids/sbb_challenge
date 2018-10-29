@@ -39,6 +39,8 @@ class Simulator(object):
         self.with_connections = True
         self.max_delta = 60 * 30
 
+        self.priorities = {}
+
         self.assign_sections_to_resources()
 
     def create_output(self):
@@ -96,7 +98,8 @@ class Simulator(object):
             resources[train.get_id()] = set([r.get_id() for s in train.get_sections() for r in s.get_resources()])
 
         delta = 60 * 60
-        for train in self.trains:
+        for i, train in enumerate(self.trains):
+            train.priority = i
             _trains = []
             start = train.network.nodes["start"].limit
             stop = train.network.nodes["end"].limit
@@ -203,6 +206,15 @@ class Simulator(object):
         # links = [link for link in links if link.is_free()]
 
         if len(links) == 0:
+            if event.time > 20 * 60 * 60:
+                link = random.choice(event.node.out_links)
+                logging.info("removing %s from to_avoid" % link)
+                a = self.qtable.to_avoid[link]
+                self.qtable.to_avoid[link].pop(random.randrange(len(a)))
+
+                del self.qtable.to_avoid[link]
+                raise BlockinException(back_time=0)
+
             event.time += self.wait_time
             self.register_event(event)
             return
@@ -242,7 +254,13 @@ class Simulator(object):
             if self.is_late(event):
                 _trains = [t for t in link.block_by() if t != event.train]
                 if len(_trains) > 0:
-                    self.avoid(event.train, random.choice(_trains), event)
+                    _train = random.choice(_trains)
+                    trains_pair = tuple(sorted((_train.priority, event.train.priority)))
+                    if trains_pair not in self.priorities:
+                        self.priorities[trains_pair] = [event.train, _train]
+
+                    a = self.priorities[trains_pair]
+                    self.avoid(a[0], a[1], event)
                 else:
                     logging.info("%s has no blocking trains" % link)
 
@@ -293,11 +311,13 @@ class Simulator(object):
 
     def avoid(self, train1, train2, event):
         blocking_link = train2.solution.sections[-1]
-        if_on = train2.solution.other_trains_sections[-1][train1]
+        bb = train2.solution.other_trains_sections[-1]
+        if train1 not in bb:
+            return
+        if_on = bb[train1]
+        back_time = blocking_link.entry_time - 60
 
         self.qtable.do_not_go(on=blocking_link.section, if_on=if_on.section)
-
-        back_time = blocking_link.entry_time - 60
 
         n1, n2 = len(self.trains), len([t for t in self.trains if t.solution.done])
 
@@ -373,7 +393,11 @@ class Simulator(object):
 
     def register_event(self, event):
         assert event.time != np.inf
+        assert event.time < 18 * 60 * 60
         event.time = max(event.time, self.current_time + 1)
+        assert not np.isnan(self.current_time)
+        assert not np.isnan(event.time)
+
         assert self.current_time < event.time, "current time = %s, event.time = %s " % (
             humanize_time(self.current_time), humanize_time(event.time))
         self.min_time = min(self.min_time, event.time)
@@ -393,6 +417,8 @@ class Simulator(object):
 
         self.events = defaultdict(list)
         self.current_time = time
+
+        assert time < np.inf
 
         # reset solutions for all trains
         for train in self.trains:
@@ -425,6 +451,7 @@ class Simulator(object):
                     assert section.exit_time != np.inf
                     release_at = section.exit_time + r.get_release_time()
                     if release_at > time:
+                        assert release_at < 25 * 60 * 60
                         next_event = ReleaseResourceEvent(train=train, time=release_at, emited_at=section.exit_time,
                                                           resource=r)
                         self.register_event(next_event)
@@ -436,8 +463,10 @@ class Simulator(object):
 
                 if last_section.exit_time >= time:
                     last_section.exit_time = np.inf
+                    assert last_section.entry_time < np.inf
                     event = self.next_event_for_train(to_section=last_section, at=last_section.entry_time)
                     event.time = max(time, event.time)
+                    assert event.time < 18 * 60 * 60
                     self.register_event(event)
                     for r in last_section.get_resources():
                         r.enter(train, at=last_section.entry_time)
@@ -448,6 +477,7 @@ class Simulator(object):
                         assert last_section.exit_time != np.inf
                         release_at = last_section.exit_time + r.get_release_time()
                         if release_at > time:
+                            assert release_at < 25 * 60 * 60
                             next_event = ReleaseResourceEvent(train=train, time=release_at,
                                                               emited_at=last_section.exit_time, resource=r)
                             self.register_event(next_event)

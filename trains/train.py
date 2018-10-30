@@ -14,7 +14,7 @@ class Train(object):
         self.requirements = None
         self.id = self._data["id"]
         self.hash = hash(self.get_id())
-        self.priority = 0
+        self.int_id = 0
 
     def get_id(self):
         return self.id

@@ -40,6 +40,7 @@ class Simulator(object):
         self.max_delta = 60 * 30
 
         self.priorities = {}
+        self.blocked_trains = set()
 
         self.assign_sections_to_resources()
 
@@ -99,7 +100,7 @@ class Simulator(object):
 
         delta = 60 * 60
         for i, train in enumerate(self.trains):
-            train.priority = i
+            train.int_id = i
             _trains = []
             start = train.network.nodes["start"].limit
             stop = train.network.nodes["end"].limit
@@ -195,36 +196,30 @@ class Simulator(object):
         train = event.train
         state = get_state_id(train, self.n_state)
         section = train.solution.get_current_section()
-        links = event.node.out_links
+        _links = event.node.out_links
 
-        if self.if_at_end(section, event):
+        if train in self.blocked_trains:
+            self.blocked_trains.add(train)
+
+        if self.if_at_end(section, event, state):
             return
 
         if section is not None:
-            links = self.remove_link_to_avoid(links, event.train)
+            _links = self.remove_link_to_avoid(_links, event.train)
 
-        # links = [link for link in links if link.is_free()]
-
-        if len(links) == 0:
-            if event.time > 20 * 60 * 60:
-                link = random.choice(event.node.out_links)
-                logging.info("removing %s from to_avoid" % link)
-                a = self.qtable.to_avoid[link]
-                self.qtable.to_avoid[link].pop(random.randrange(len(a)))
-
-                del self.qtable.to_avoid[link]
-                raise BlockinException(back_time=0)
-
+        if len(_links) == 0:
             event.time += self.wait_time
             self.register_event(event)
             return
 
-        link = self.qtable.get_action(links, state)
+        links = [link for link in _links if link.is_free()]
 
-        if self.check_if_free(link, event):
+        if self.check_if_free(links, _links, event):
             return
 
-            # can I already enter this link?
+        link = self.qtable.get_action(links, state)
+
+        # can I already enter this link?
         if self.check_earliest_entry(link, event):
             return
 
@@ -238,34 +233,34 @@ class Simulator(object):
         train.solution.save_states(section=to_section, state=state)
         self.update(train=event.train, state=state, time=event.time)
 
-    def if_at_end(self, section, event):
+    def if_at_end(self, section, event, state):
         if event.node.label == "end":
             event.train.solution.done = True
             self.go_to_section(from_section=section, to_section=None, at=event.time)
-            # self.update(train=event.train, state=state, time=event.time)
+            self.update(train=event.train, state=state, time=event.time)
             return True
         return False
 
-    def check_if_free(self, link, event):
-        if link.is_free():
+    def check_if_free(self, links, _links, event):
+        if len(links) > 0:
             return False
+        else:
+            link = random.choice(_links)
+            self.blocked_trains.add(link.train)
+            #blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
+            blocking_tains = set(link.block_by())
+            if self.is_late(event) and len(blocking_tains) > 0:
+                _train = blocking_tains.pop()
+                trains_pair = tuple(sorted((_train.int_id, event.train.int_id)))
 
-        if not link.is_free():
-            if self.is_late(event):
-                _trains = [t for t in link.block_by() if t != event.train]
-                if len(_trains) > 0:
-                    _train = random.choice(_trains)
-                    trains_pair = tuple(sorted((_train.priority, event.train.priority)))
-                    if trains_pair not in self.priorities:
-                        self.priorities[trains_pair] = [event.train, _train]
-
-                    a = self.priorities[trains_pair]
-                    self.avoid(a[0], a[1], event)
-                else:
-                    logging.info("%s has no blocking trains" % link)
+                if trains_pair not in self.priorities:
+                    self.priorities[trains_pair] = [event.train, _train]
+                a = self.priorities[trains_pair]
+                self.avoid(a[0], a[1], event)
 
             event.time += self.wait_time
             self.register_event(event)
+
             return True
 
     def check_earliest_entry(self, section, event):
@@ -315,7 +310,7 @@ class Simulator(object):
         if train1 not in bb:
             return
         if_on = bb[train1]
-        back_time = blocking_link.entry_time - 60
+        back_time = blocking_link.entry_time - 1
 
         self.qtable.do_not_go(on=blocking_link.section, if_on=if_on.section)
 
@@ -410,6 +405,7 @@ class Simulator(object):
                 return train
 
     def go_back(self, time):
+        self.blocked_trains = set()
         self.min_time = 9999999
         self.max_time = 0
 

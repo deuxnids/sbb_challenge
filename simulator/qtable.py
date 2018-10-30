@@ -33,6 +33,9 @@ class QTable(object):
                 if value > max_value:
                     action = c
                     max_value = value
+        if action is None:
+            #I don't why but needed for problem 9
+            action = random.choice(choices)
         return action
 
     def update_table(self, previous_state, current_state, previous_action, reward):

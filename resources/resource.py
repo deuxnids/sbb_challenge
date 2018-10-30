@@ -59,8 +59,11 @@ class Resource(object):
         self.last_exit_time = at
 
     def release(self, train, release_time):
+        if release_time < self.last_exit_time:
+            return
+
         assert self.free is False
-        assert self.currently_used_by is None
+        assert self.currently_used_by is None, "%s %s" % (train, self)
         assert train == self.last_used_by
 
         self.free = True

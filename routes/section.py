@@ -27,7 +27,7 @@ class Section(object):
             self.requirement = requirements[0]
 
         self.id = "%s#%s" % (self.path._route.get_id(), self.get_number())
-        self.minimum_running_time= isodate.parse_duration(self._data["minimum_running_time"]).seconds
+        self.minimum_running_time = isodate.parse_duration(self._data["minimum_running_time"]).seconds
 
     def __repr__(self):
         return "%s" % (self.get_id())
@@ -103,7 +103,6 @@ class Section(object):
             if not r.is_free_for(train=self.train):
                 return False
         return True
-
 
     def block_by(self):
         blocking_trains = []

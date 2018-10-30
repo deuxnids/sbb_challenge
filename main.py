@@ -11,8 +11,6 @@ sys.path.append(r"/Users/denism/work/sbb_challenge/utils")
 from simulator.simulator import Simulator
 from simulator.simulator import BlockinException
 from simulator.qtable import QTable
-from simulator.event import humanize_time
-import numpy as np
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -45,15 +43,15 @@ i = 1
 """
 
 sim.wait_time = 60
-sim.max_delta = 10 * 60
-sim.n_state = 0
+sim.max_delta = 15 * 60
+sim.n_state = 2
 
 # dijkstra or ..
 sim.late_on_node = False
 sim.with_connections = True
 sim.backward = True
 
-qtable.epsilon = 0.2
+qtable.epsilon = 0.8
 qtable.alpha = 0.8  # learning rate
 qtable.gamma = 0.8  # discount factor
 
@@ -62,13 +60,13 @@ sim.assign_sections_to_resources()
 sim.match_trains()
 sim.spiegel_anschlusse()
 
-score = 800
+score = 300
 random.seed(2018)
 
 logging.info("problem %s" % path)
 logging.info("with backward %s" % sim.backward)
 kk = 1
-sub_tour = 100000
+sub_tour = 1000000
 while i < 200:
     sim.initialize()
     sim.free_all_resources()
@@ -80,6 +78,7 @@ while i < 200:
                 sim.initialize()
                 sim.free_all_resources()
             j += 1
+            sim.blocked_trains = set()
             sim.run()
         except BlockinException as e:
 
@@ -89,6 +88,8 @@ while i < 200:
                 sim.go_back(e.back_time)
     if j == sub_tour:
         logging.info("resetting")
+    sim.wait_time = max(1.0, sim.wait_time - 5)
+    logging.info(sim.wait_time)
     if sim.compute_score() < score:
         break
 

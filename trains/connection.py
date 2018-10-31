@@ -27,5 +27,11 @@ class WaitingConnection(object):
         self.from_section_marker = from_section_marker
         self.min_connection_time = min_time
 
+    def get_id(self):
+        return "%s_%s" % (self.from_train.get_id(), self.from_section_marker)
+
+    def __hash__(self):
+        return hash(self.get_id())
+
     def __str__(self):
         return "%s %s" % self.from_section_marker, self.min_connection_time

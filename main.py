@@ -18,7 +18,7 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-no = "05"
+no = "09"
 path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/" + no + "*")[
     0]
 
@@ -57,10 +57,10 @@ qtable.gamma = 0.8  # discount factor
 
 sim.initialize()
 sim.assign_sections_to_resources()
-sim.match_trains()
 sim.spiegel_anschlusse()
+sim.match_trains()
 
-score = 300
+score = 900
 random.seed(2018)
 
 logging.info("problem %s" % path)
@@ -79,6 +79,8 @@ while i < 200:
                 sim.free_all_resources()
             j += 1
             sim.blocked_trains = set()
+            t = sim.get_train("271")
+            t2 = sim.get_train("2412")
             sim.run()
         except BlockinException as e:
 
@@ -94,6 +96,6 @@ while i < 200:
         break
 
 folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"
-output_path = os.path.join(folder, sim.timetable.label + "_for_submission.json")
+output_path = os.path.join(folder, sim.timetable.label.replace("/", "_") + "_for_submission.json")
 with open(output_path, 'w') as outfile:
     json.dump([sim.create_output()], outfile)

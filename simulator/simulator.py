@@ -115,14 +115,16 @@ class Simulator(object):
                         _trains.append(_train)
             train.other_trains = _trains
 
+        # is this used?
         for train in self.trains:
+
             train.connection_trains = set()
             for s in train.network.sections.values():
                 if s.get_requirement() is not None:
                     for id in s.get_requirement().get_connections():
                         c_t = self.get_train(id)
-                        if c_t is not None:
-                            train.connection_trains.add(c_t)
+                        # if c_t is not None:
+                        train.connection_trains.add(c_t)
             train.connection_trains = list(train.connection_trains)
 
     def spiegel_anschlusse(self):
@@ -134,12 +136,18 @@ class Simulator(object):
                         wc = WaitingConnection(from_train=train, from_section_marker=s.marker,
                                                min_time=c.get_min_connection_time())
                         to_train = self.get_train(c.get_onto_service_intention())
-                        if to_train is not None:
-                            for _s in to_train.network.sections.values():
-                                if _s.marker == s.marker:
-                                    assert _s.get_requirement() is not None
-                                    _r = _s.get_requirement()
-                                    _r.waiting_connections.append(wc)
+                        for _s in to_train.network.sections.values():
+                            if _s.marker == s.marker:
+                                assert _s.get_requirement() is not None
+                                _r = _s.get_requirement()
+                                _r.waiting_connections.append(wc)
+
+        for train in self.trains:
+            for r in train.get_requirements():
+                con = {}
+                for wc in r.waiting_connections:
+                    con[wc.get_id()] = wc
+                r.waiting_connections = list(con.values())
 
     def compute_score(self):
         score = 0
@@ -204,6 +212,10 @@ class Simulator(object):
         if self.if_at_end(section, event, state):
             return
 
+        # can I already leave previous_section? or should I wait for a connecting train?
+        if self.check_connections(section, event):
+            return
+
         if section is not None:
             _links = self.remove_link_to_avoid(_links, event.train)
 
@@ -223,9 +235,6 @@ class Simulator(object):
         if self.check_earliest_entry(link, event):
             return
 
-        # can I already leave previous_section? or should I wait for a connecting train?
-        if self.check_connections(section, event):
-            return
 
         to_section = SectionSolution(link)
         self.go_to_section(from_section=section, to_section=to_section, at=event.time)
@@ -247,7 +256,7 @@ class Simulator(object):
         else:
             link = random.choice(_links)
             self.blocked_trains.add(link.train)
-            #blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
+            # blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
             blocking_tains = set(link.block_by())
             if self.is_late(event) and len(blocking_tains) > 0:
                 _train = blocking_tains.pop()
@@ -401,7 +410,7 @@ class Simulator(object):
 
     def get_train(self, name):
         for train in self.trains:
-            if train.get_id() == name:
+            if str(train.get_id()) == str(name):
                 return train
 
     def go_back(self, time):

@@ -224,7 +224,7 @@ class Simulator(object):
         _links = event.node.out_links
 
         if train in self.blocked_trains:
-            self.blocked_trains.add(train)
+            self.blocked_trains.remove(train)
 
         if self.if_at_end(section, event):
             return
@@ -276,8 +276,8 @@ class Simulator(object):
         else:
             link = random.choice(_links)
             self.blocked_trains.add(link.train)
-            # blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
-            blocking_tains = set(link.block_by())
+            blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
+            #blocking_tains = set(link.block_by())
             if self.is_late(event) and len(blocking_tains) > 0:
                 _train = blocking_tains.pop()
                 trains_pair = tuple(sorted((_train.int_id, event.train.int_id)))
@@ -419,7 +419,7 @@ class Simulator(object):
 
     def register_event(self, event):
         assert event.time != np.inf
-        assert event.time < 18 * 60 * 60
+        assert event.time < 24 * 60 * 60
         event.time = max(event.time, self.current_time + 1)
         assert not np.isnan(self.current_time)
         assert not np.isnan(event.time)

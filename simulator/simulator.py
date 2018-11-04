@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import random
+import itertools
 
 from timetable import Timetable
 from simulator.event import EnterNodeEvent
@@ -16,7 +17,8 @@ from trains.solution import Solution, SectionSolution
 
 
 class BlockinException(Exception):
-    def __init__(self, back_time):
+    def __init__(self, back_time, n):
+        self.n = n
         self.back_time = back_time
 
 
@@ -99,8 +101,19 @@ class Simulator(object):
             resources[train.get_id()] = set([r.get_id() for s in train.get_sections() for r in s.get_resources()])
 
         delta = 60 * 60
-        for i, train in enumerate(self.trains):
+
+        for i, train in enumerate(sorted(self.trains, key=lambda x: len(x.get_requirements()))):
             train.int_id = i
+
+        #for train1, train2 in itertools.combinations(self.trains, 2):
+        #    trains_pair = tuple(sorted((train1.int_id, train2.int_id)))
+
+        #    if trains_pair not in self.priorities:
+        #        a = sorted([train1, train2],
+        #                   key=lambda t: t.network.nodes["end"].limit - t.network.nodes["start"].limit, reverse=True)
+         #       self.priorities[trains_pair] = a
+
+        for i, train in enumerate(self.trains):
             _trains = []
             start = train.network.nodes["start"].limit
             stop = train.network.nodes["end"].limit
@@ -116,16 +129,16 @@ class Simulator(object):
             train.other_trains = _trains
 
         # is this used?
-        for train in self.trains:
+        # for train in self.trains:
 
-            train.connection_trains = set()
-            for s in train.network.sections.values():
-                if s.get_requirement() is not None:
-                    for id in s.get_requirement().get_connections():
-                        c_t = self.get_train(id)
-                        # if c_t is not None:
-                        train.connection_trains.add(c_t)
-            train.connection_trains = list(train.connection_trains)
+        #    train.connection_trains = set()
+        #    for s in train.network.sections.values():
+        #        if s.get_requirement() is not None:
+        #            for id in s.get_requirement().get_connections():
+        #                c_t = self.get_train(id)
+        #                # if c_t is not None:
+        #                train.connection_trains.add(c_t)
+        #    train.connection_trains = list(train.connection_trains)
 
     def spiegel_anschlusse(self):
         for train in self.trains:
@@ -136,8 +149,9 @@ class Simulator(object):
                         wc = WaitingConnection(from_train=train, from_section_marker=s.marker,
                                                min_time=c.get_min_connection_time())
                         to_train = self.get_train(c.get_onto_service_intention())
+                        marker = c.get_onto_section_marker()
                         for _s in to_train.network.sections.values():
-                            if _s.marker == s.marker:
+                            if _s.marker == marker:
                                 assert _s.get_requirement() is not None
                                 _r = _s.get_requirement()
                                 _r.waiting_connections.append(wc)
@@ -198,18 +212,21 @@ class Simulator(object):
         if self.late_on_node:
             return self.is_late_on_node(event)
         else:
-            return event.time > event.node.limit + self.max_delta
+            ts = event.train.network.nodes["start"].limit
+            tf = event.train.network.nodes["end"].limit
+            tc = event.node.limit
+            delta = np.interp(tc, [ts, tf], [self.min_delta, self.max_delta])
+            return event.time > event.node.limit + delta
 
     def on_node(self, event):
         train = event.train
-        state = get_state_id(train, self.n_state)
         section = train.solution.get_current_section()
         _links = event.node.out_links
 
         if train in self.blocked_trains:
             self.blocked_trains.add(train)
 
-        if self.if_at_end(section, event, state):
+        if self.if_at_end(section, event):
             return
 
         # can I already leave previous_section? or should I wait for a connecting train?
@@ -229,12 +246,13 @@ class Simulator(object):
         if self.check_if_free(links, _links, event):
             return
 
+
+        state = get_state_id(train, self.n_state)
         link = self.qtable.get_action(links, state)
 
         # can I already enter this link?
         if self.check_earliest_entry(link, event):
             return
-
 
         to_section = SectionSolution(link)
         self.go_to_section(from_section=section, to_section=to_section, at=event.time)
@@ -242,8 +260,10 @@ class Simulator(object):
         train.solution.save_states(section=to_section, state=state)
         self.update(train=event.train, state=state, time=event.time)
 
-    def if_at_end(self, section, event, state):
+    def if_at_end(self, section, event):
         if event.node.label == "end":
+
+            state = get_state_id(event.train, self.n_state)
             event.train.solution.done = True
             self.go_to_section(from_section=section, to_section=None, at=event.time)
             self.update(train=event.train, state=state, time=event.time)
@@ -263,7 +283,9 @@ class Simulator(object):
                 trains_pair = tuple(sorted((_train.int_id, event.train.int_id)))
 
                 if trains_pair not in self.priorities:
-                    self.priorities[trains_pair] = [event.train, _train]
+                    b = [event.train, _train]
+                    random.shuffle(b)
+                    self.priorities[trains_pair] = b
                 a = self.priorities[trains_pair]
                 self.avoid(a[0], a[1], event)
 
@@ -319,7 +341,7 @@ class Simulator(object):
         if train1 not in bb:
             return
         if_on = bb[train1]
-        back_time = blocking_link.entry_time - 1
+        back_time = blocking_link.entry_time - 1 #- random.randint(1, 30 * 60)
 
         self.qtable.do_not_go(on=blocking_link.section, if_on=if_on.section)
 
@@ -328,7 +350,7 @@ class Simulator(object):
         logging.info("%s (%i/%i) \tDO NOT ENTER %s IF ON %s going back to %s " % (
             humanize_time(event.time), n2, n1, blocking_link, if_on, humanize_time(back_time)))
 
-        raise BlockinException(back_time=back_time)
+        raise BlockinException(back_time=back_time, n=n2)
 
     def assign_limit(self):
         for train in self.trains:

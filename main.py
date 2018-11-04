@@ -1,12 +1,16 @@
 import logging
 import sys
+import numpy as np
 import glob
 import os
 import json
 import random
+import time
+import argparse
+from collections import defaultdict
 
-sys.path.append(r"/Users/denism/work/sbb_challenge")
-sys.path.append(r"/Users/denism/work/sbb_challenge/utils")
+#sys.path.append(r"/Users/denism/work/sbb_challenge")
+#sys.path.append(r"/Users/denism/work/sbb_challenge/utils")
 
 from simulator.simulator import Simulator
 from simulator.simulator import BlockinException
@@ -18,84 +22,103 @@ logger.setLevel(logging.INFO)
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s ] %(message)s"
 logging.basicConfig(format=FORMAT)
 
-no = "09"
-path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/" + no + "*")[
-    0]
+if __name__ == "__main__":
 
-qtable = QTable()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--no", default="02")
+    parser.add_argument("--wait", default=10, type=int)
+    parser.add_argument("--max_delta", default=15*60, type=int)
+    parser.add_argument("--min_delta", default=60, type=int)
+    parser.add_argument("--n_state", default=10, type=int)
+    parser.add_argument("--epsilon", default=0.8, type=float)
+    parser.add_argument("--alpha", default=0.8, type=float)
+    parser.add_argument("--gamma", default=0.8, type=float)
+    parser.add_argument("--seed", default=2018, type=int)
 
-sim = Simulator(path=path, qtable=qtable)
-sim.trains = sim.trains
-sim.assign_limit()
+    args = parser.parse_args()
+    no = args.no
 
-i = 1
+    #path = glob.glob(r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/problem_instances/" + no + "*")[0]
+    path = glob.glob(r"inputs/" + no + "*")[0]
 
-"""
-1:
-2:
-3:
-4:
-5:
-6: backward, mulit ->523, 499, 412, 456, 410, 387 (wait_time=30)
-7:
-8:
-9: 
-"""
+    qtable = QTable()
 
-sim.wait_time = 60
-sim.max_delta = 15 * 60
-sim.n_state = 2
+    sim = Simulator(path=path, qtable=qtable)
+    sim.trains = sim.trains
+    sim.assign_limit()
 
-# dijkstra or ..
-sim.late_on_node = False
-sim.with_connections = True
-sim.backward = True
+    sim.wait_time = args.wait
+    sim.max_delta = args.max_delta
+    sim.min_delta = args.min_delta
+    sim.n_state = args.n_state
 
-qtable.epsilon = 0.8
-qtable.alpha = 0.8  # learning rate
-qtable.gamma = 0.8  # discount factor
+    # dijkstra or ..
+    sim.late_on_node = False
+    sim.with_connections = True
+    sim.backward = True
 
-sim.initialize()
-sim.assign_sections_to_resources()
-sim.spiegel_anschlusse()
-sim.match_trains()
+    qtable.epsilon = args.epsilon
+    qtable.alpha = args.alpha  # learning rate
+    qtable.gamma = args.gamma  # discount factor
 
-score = 900
-random.seed(2018)
-
-logging.info("problem %s" % path)
-logging.info("with backward %s" % sim.backward)
-kk = 1
-sub_tour = 1000000
-while i < 200:
     sim.initialize()
-    sim.free_all_resources()
-    i += 1
-    j = 1
-    while not sim.done and j < sub_tour:
-        try:
-            if not sim.backward:
-                sim.initialize()
-                sim.free_all_resources()
-            j += 1
-            sim.blocked_trains = set()
-            t = sim.get_train("271")
-            t2 = sim.get_train("2412")
-            sim.run()
-        except BlockinException as e:
+    sim.assign_sections_to_resources()
+    sim.spiegel_anschlusse()
+    sim.match_trains()
 
-            n, n2 = len(sim.trains), len([t for t in sim.trains if t.solution.done])
-            # logging.info("%s: %i/%i trains" % (humanize_time(sim.current_time), n2, n))
-            if sim.backward:
-                sim.go_back(e.back_time)
-    if j == sub_tour:
-        logging.info("resetting")
-    sim.wait_time = max(1.0, sim.wait_time - 5)
-    logging.info(sim.wait_time)
-    if sim.compute_score() < score:
-        break
+    score = np.inf
+    random.seed(args.seed)
 
-folder = r"/Users/denism/work/train-schedule-optimisation-challenge-starter-kit/solutions"
-output_path = os.path.join(folder, sim.timetable.label.replace("/", "_") + "_for_submission.json")
-with open(output_path, 'w') as outfile:
-    json.dump([sim.create_output()], outfile)
+    logging.info("problem %s" % path)
+    logging.info("with backward %s" % sim.backward)
+
+    start_time = time.time()
+
+    folder = r"outputs/"
+    output_folder = os.path.join(folder, sim.timetable.label.replace("/", "_"))
+    if not os.path.exists(output_folder):
+        os.mkdir(output_folder)
+
+    i = 1
+    sub_tour = 1000000
+    while i < 200:
+        sim.initialize()
+        sim.free_all_resources()
+        i += 1
+        j = 1
+        last_n = None
+        sim.qtable.to_avoid = defaultdict(list)
+        while not sim.done and j < sub_tour:
+            try:
+                if (time.time()-start_time) > 15*60:
+                    sys.exit()
+
+                if not sim.backward:
+                    sim.initialize()
+                    sim.free_all_resources()
+                sim.blocked_trains = set()
+                sim.run()
+
+                _score = sim.compute_score()
+                if sim.compute_score() < score:
+                    score = _score
+                    output_path = os.path.join(output_folder, "%f.json" % score)
+                    with open(output_path, 'w') as outfile:
+                        json.dump([sim.create_output()], outfile)
+                    if score == 0.0:
+                        break
+
+                sim.wait_time = max(1.0, sim.wait_time - 5)
+            except BlockinException as e:
+                if sim.backward:
+                    sim.go_back(e.back_time)
+        #            if last_n == e.n:
+        #                j += 1
+        #            else:
+        #                j = 1
+        #                last_n = e.n
+        #if j == sub_tour:
+            #logging.info("resetting")
+            #sim.wait_time = max(1.0, sim.wait_time - 5)
+            #logging.info(sim.wait_time)
+

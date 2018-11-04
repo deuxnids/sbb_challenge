@@ -493,7 +493,7 @@ class Simulator(object):
                     assert last_section.entry_time < np.inf
                     event = self.next_event_for_train(to_section=last_section, at=last_section.entry_time)
                     event.time = max(time, event.time)
-                    assert event.time < 18 * 60 * 60
+                    assert event.time < 25 * 60 * 60
                     self.register_event(event)
                     for r in last_section.get_resources():
                         r.enter(train, at=last_section.entry_time)

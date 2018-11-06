@@ -26,10 +26,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--no", default="06")
-    parser.add_argument("--wait", default=1, type=int)
-    parser.add_argument("--max_delta", default=15*60, type=int)
+    parser.add_argument("--wait", default=10, type=int)
+    parser.add_argument("--max_delta", default=60, type=int)
     parser.add_argument("--min_delta", default=60, type=int)
-    parser.add_argument("--n_state", default=10, type=int)
+    parser.add_argument("--n_state", default=1, type=int)
     parser.add_argument("--epsilon", default=0.1, type=float)
     parser.add_argument("--alpha", default=0.8, type=float)
     parser.add_argument("--gamma", default=0.8, type=float)
@@ -110,6 +110,10 @@ if __name__ == "__main__":
 
                 sim.wait_time = max(1.0, sim.wait_time - 5)
             except BlockinException as e:
+
+                delays = [t.solution.get_delays() for t in sim.trains]
+                delays = [d for d in delays if d > 0.0]
+                logging.info(delays)
                 if sim.backward:
                     sim.go_back(e.back_time)
         #            if last_n == e.n:

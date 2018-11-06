@@ -111,9 +111,9 @@ if __name__ == "__main__":
                 sim.wait_time = max(1.0, sim.wait_time - 5)
             except BlockinException as e:
 
-                delays = [t.solution.get_delays() for t in sim.trains]
-                delays = [d for d in delays if d > 0.0]
-                logging.info(delays)
+                #delays = [t.solution.get_delays() for t in sim.trains]
+                #delays = [d for d in delays if d > 0.0]
+                #logging.info(delays)
                 if sim.backward:
                     sim.go_back(e.back_time)
         #            if last_n == e.n:

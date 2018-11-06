@@ -87,7 +87,7 @@ if __name__ == "__main__":
         i += 1
         j = 1
         last_n = None
-        #sim.qtable.to_avoid = defaultdict(list)
+        sim.qtable.to_avoid = defaultdict(list)
         while not sim.done and j < sub_tour:
             try:
                 if (time.time()-start_time) > 2*15*60:

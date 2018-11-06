@@ -90,7 +90,7 @@ if __name__ == "__main__":
         sim.qtable.to_avoid = defaultdict(list)
         while not sim.done and j < sub_tour:
             try:
-                if (time.time()-start_time) > 15*60:
+                if (time.time()-start_time) > 2*15*60:
                     sys.exit()
 
                 if not sim.backward:

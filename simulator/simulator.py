@@ -276,8 +276,8 @@ class Simulator(object):
         else:
             link = random.choice(_links)
             self.blocked_trains.add(link.train)
-            blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
-            #blocking_tains = set(link.block_by())
+            #blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
+            blocking_tains = set(link.block_by())
             if self.is_late(event) and len(blocking_tains) > 0:
                 _train = blocking_tains.pop()
                 trains_pair = tuple(sorted((_train.int_id, event.train.int_id)))

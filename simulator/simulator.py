@@ -354,12 +354,10 @@ class Simulator(object):
 
     def assign_limit(self):
         for train in self.trains:
-            distances = dijkstra(source="start", dest="end", train=train)
+            distances = dijkstra(source="end", train=train)
 
-            l = list(train.network.nodes["end"].in_links)[0]
-            r = l.get_requirement()
             for n in train.network.nodes.values():
-                n.limit = r.get_exit_latest() - (distances["end"] - distances[n.label])
+                n.limit = distances[n.label]
 
     def free_all_resources(self):
         for r in self.resources.values():

@@ -2,51 +2,51 @@ from collections import deque
 import numpy as np
 
 
-def dijkstra(source, dest, train):
+def dijkstra(source, train):
     # 1. Mark all nodes unvisited and store them.
     # 2. Set the distance to zero for our initial node
     # and to infinity for other nodes.
-    distances = {vertex.label: np.inf for vertex in train.network.nodes.values()}
-    previous_vertices = {vertex.label: None for vertex in train.network.nodes.values()}
-    distances[source] = 0
+    distances = {vertex.label: -np.inf for vertex in train.network.nodes.values()}
+    #previous_vertices = {vertex.label: None for vertex in train.network.nodes.values()}
     vertices = train.network.nodes.copy()
+    r = vertices[source].in_links[0].get_requirement()
+    distances[source] = r.get_exit_latest()
 
     while vertices:
         # 3. Select the unvisited node with the smallest distance,
         # it's current node now.
-        current_vertex = min(vertices, key=lambda vertex: distances[vertex])
+        current_vertex = max(vertices, key=lambda vertex: distances[vertex])
         # 6. Stop, if the smallest distance
         # among the unvisited nodes is infinity.
-        if distances[current_vertex] == np.inf:
+        if distances[current_vertex] == -np.inf:
             break
 
         # 4. Find unvisited neighbors for the current node
         # and calculate their distances through the current node.
-        for edge in vertices[current_vertex].out_links:
-            neighbour = edge.end_node
-            cost = edge.get_minimum_running_time()
+        for edge in vertices[current_vertex].in_links:
+            neighbour = edge.start_node
             r = edge.get_requirement()
 
+            entry_latest = distances[current_vertex] - edge.get_minimum_running_time()
             if r is not None:
                 if r.get_min_stopping_time() is not None:
-                    cost += r.get_min_stopping_time()
-
-            alternative_route = distances[current_vertex] + cost
+                    entry_latest = entry_latest - r.get_min_stopping_time()
+                    entry_latest = min(r.get_entry_latest(), entry_latest)
 
             # Compare the newly calculated distance to the assigned
             # and save the smaller one.
-            if alternative_route < distances[neighbour.label]:
-                distances[neighbour.label] = alternative_route
-                previous_vertices[neighbour.label] = current_vertex
+            if entry_latest > distances[neighbour.label]:
+                distances[neighbour.label] = entry_latest
+                #previous_vertices[neighbour.label] = current_vertex
 
         # 5. Mark the current node as visited
         # and remove it from the unvisited set.
         del vertices[current_vertex]
 
-    path, current_vertex = deque(), dest
-    while previous_vertices[current_vertex] is not None:
-        path.appendleft(current_vertex)
-        current_vertex = previous_vertices[current_vertex]
-    if path:
-        path.appendleft(current_vertex)
+    #path, current_vertex = deque(), dest
+    #while previous_vertices[current_vertex] is not None:
+    #    path.appendleft(current_vertex)
+    #    current_vertex = previous_vertices[current_vertex]
+    #if path:
+    #    path.appendleft(current_vertex)
     return distances

@@ -6,7 +6,7 @@ import logging
 
 class QTable(object):
     def __init__(self):
-        self.q_values = defaultdict(lambda: defaultdict(lambda: random.random()*10))
+        self.q_values = defaultdict(lambda: defaultdict(lambda: random.random() * 10))
 
         self.epsilon = 0.9
         self.alpha = 0.1
@@ -34,20 +34,23 @@ class QTable(object):
                     action = c
                     max_value = value
         if action is None:
-            #I don't why but needed for problem 9
+            # I don't why but needed for problem 9
             action = random.choice(choices)
         return action
 
     def update_table(self, previous_state, current_state, previous_action, reward):
+        assert reward != np.inf and (reward != -np.inf)
         previous_value = self.q_values[previous_state][previous_action.get_id()]
         next_max = 0
         if len(self.q_values[current_state].values()) > 0:
             next_max = max(self.q_values[current_state].values())
         new_value = (1 - self.alpha) * previous_value + self.alpha * (reward + self.gamma * next_max)
+        assert new_value != np.inf
+        assert new_value != -np.inf
         self.q_values[previous_state][previous_action.get_id()] = new_value
 
     def do_not_go(self, on, if_on):
-        #if on not in self.to_avoid:
+        # if on not in self.to_avoid:
         #    return False
 
         if if_on in self.to_avoid[on]:

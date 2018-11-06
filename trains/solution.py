@@ -109,7 +109,24 @@ class Solution(object):
 
         return value
 
+    def get_delays(self):
+        value = 0.0
+
+        sections = {}
+        for section in self.sections:
+            requirement = section.get_requirement()
+            if requirement is not None:
+                sections[requirement] = section
+
+        for requirement in self.train.get_requirements():
+            if requirement in sections:
+                section = sections[requirement]
+                v = max(0, section.entry_time - requirement.get_entry_latest())
+                value += v
+        return value
+
     def save_states(self, section, state):
         self.sections.append(section)
-        self.other_trains_sections.append({t: t.solution.sections[-1] for t in self.train.other_trains if len(t.solution.sections) > 0})
+        self.other_trains_sections.append(
+            {t: t.solution.sections[-1] for t in self.train.other_trains if len(t.solution.sections) > 0})
         self.states.append(state)

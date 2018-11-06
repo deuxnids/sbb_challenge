@@ -42,7 +42,7 @@ class Simulator(object):
         self.max_delta = 60 * 30
 
         self.priorities = {}
-        self.blocked_trains = set()
+        # self.blocked_trains = set()
 
         self.assign_sections_to_resources()
 
@@ -105,13 +105,13 @@ class Simulator(object):
         for i, train in enumerate(sorted(self.trains, key=lambda x: len(x.get_requirements()))):
             train.int_id = i
 
-        #for train1, train2 in itertools.combinations(self.trains, 2):
+        # for train1, train2 in itertools.combinations(self.trains, 2):
         #    trains_pair = tuple(sorted((train1.int_id, train2.int_id)))
 
         #    if trains_pair not in self.priorities:
         #        a = sorted([train1, train2],
         #                   key=lambda t: t.network.nodes["end"].limit - t.network.nodes["start"].limit, reverse=True)
-         #       self.priorities[trains_pair] = a
+        #       self.priorities[trains_pair] = a
 
         for i, train in enumerate(self.trains):
             _trains = []
@@ -221,10 +221,36 @@ class Simulator(object):
     def on_node(self, event):
         train = event.train
         section = train.solution.get_current_section()
-        _links = event.node.out_links
+        all_links = event.node.out_links
 
-        if train in self.blocked_trains:
-            self.blocked_trains.remove(train)
+        # if train in self.blocked_trains:
+        #    self.blocked_trains.remove(train)
+
+#        if self.is_late(event):
+#            logging.info(event)
+#            logging.info(humanize_time(event.node.limit))
+#            if len(train.solution.states) > 1:
+#                p_state = train.solution.states[-2]
+#                c_state = train.solution.states[-1]
+#                last_action = train.solution.sections[-2]
+#
+#                reward = -10
+#                logging.info(p_state)
+#                logging.info(self.qtable.q_values[p_state].values())
+#                self.qtable.update_table(p_state, current_state=c_state, previous_action=last_action, reward=reward)
+#                logging.info(self.qtable.q_values[p_state].values())
+#
+#
+#
+#                n1, n2 = len(self.trains), len([t for t in self.trains if t.solution.done])
+#                requirement = train.get_requirements()[0]
+#                back_time = requirement.get_entry_earliest()
+#                logging.info("%s %s (%i/%i)  going back to %s " % (
+#                    humanize_time(event.time), event, n2, n1, humanize_time(back_time)))
+
+#                self.qtable.to_avoid = defaultdict(list)
+#
+#                raise BlockinException(back_time=back_time, n=n2)
 
         if self.if_at_end(section, event):
             return
@@ -233,22 +259,22 @@ class Simulator(object):
         if self.check_connections(section, event):
             return
 
+        links_without_avoid = all_links
         if section is not None:
-            _links = self.remove_link_to_avoid(_links, event.train)
+            links_without_avoid = self.remove_link_to_avoid(all_links, event.train)
 
-        if len(_links) == 0:
+        if len(links_without_avoid) == 0:
             event.time += self.wait_time
             self.register_event(event)
             return
 
-        links = [link for link in _links if link.is_free()]
+        free_links = [link for link in links_without_avoid if link.is_free()]
 
-        if self.check_if_free(links, _links, event):
+        if self.check_if_free(free_links, links_without_avoid, event):
             return
 
-
         state = get_state_id(train, self.n_state)
-        link = self.qtable.get_action(links, state)
+        link = self.qtable.get_action(free_links, state)
 
         # can I already enter this link?
         if self.check_earliest_entry(link, event):
@@ -262,7 +288,6 @@ class Simulator(object):
 
     def if_at_end(self, section, event):
         if event.node.label == "end":
-
             state = get_state_id(event.train, self.n_state)
             event.train.solution.done = True
             self.go_to_section(from_section=section, to_section=None, at=event.time)
@@ -270,13 +295,13 @@ class Simulator(object):
             return True
         return False
 
-    def check_if_free(self, links, _links, event):
-        if len(links) > 0:
+    def check_if_free(self, free_links, links, event):
+        if len(free_links) > 0:
             return False
         else:
-            link = random.choice(_links)
-            self.blocked_trains.add(link.train)
-            #blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
+            link = random.choice(links)
+            # self.blocked_trains.add(link.train)
+            # blocking_tains = set(link.block_by()).intersection(self.blocked_trains)
             blocking_tains = set(link.block_by())
             if self.is_late(event) and len(blocking_tains) > 0:
                 _train = blocking_tains.pop()
@@ -284,7 +309,7 @@ class Simulator(object):
 
                 if trains_pair not in self.priorities:
                     b = [event.train, _train]
-                    random.shuffle(b)
+                    # random.shuffle(b)
                     self.priorities[trains_pair] = b
                 a = self.priorities[trains_pair]
                 self.avoid(a[0], a[1], event)
@@ -341,7 +366,7 @@ class Simulator(object):
         if train1 not in bb:
             return
         if_on = bb[train1]
-        back_time = blocking_link.entry_time - 1 #- random.randint(1, 30 * 60)
+        back_time = blocking_link.entry_time - 1  # - random.randint(1, 30 * 60)
 
         self.qtable.do_not_go(on=blocking_link.section, if_on=if_on.section)
 
@@ -368,11 +393,12 @@ class Simulator(object):
 
     def update(self, train, state, time):
         if len(train.solution.sections) > 1:
-            p_state = train.solution.states[-1]
-            last_action = train.solution.sections[-1]
+            p_state = train.solution.states[-2]
+            c_state = train.solution.states[-1]
+            last_action = train.solution.sections[-2]
 
             reward = 10.0 - last_action.calc_penalty()
-            self.qtable.update_table(p_state, current_state=state, previous_action=last_action, reward=reward)
+            self.qtable.update_table(p_state, current_state=c_state, previous_action=last_action, reward=reward)
 
     def go_to_section(self, from_section, to_section, at):
         train = from_section.train
@@ -434,7 +460,7 @@ class Simulator(object):
                 return train
 
     def go_back(self, time):
-        self.blocked_trains = set()
+        # self.blocked_trains = set()
         self.min_time = 9999999
         self.max_time = 0
 

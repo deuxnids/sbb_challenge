@@ -397,7 +397,9 @@ class Simulator(object):
             c_state = train.solution.states[-1]
             last_action = train.solution.sections[-2]
 
-            reward = 10.0 - last_action.calc_penalty()
+            reward = - last_action.calc_penalty() - 100*max(0,
+                                                        last_action.entry_time - last_action.section.start_node.limit)
+
             self.qtable.update_table(p_state, current_state=c_state, previous_action=last_action, reward=reward)
 
     def go_to_section(self, from_section, to_section, at):

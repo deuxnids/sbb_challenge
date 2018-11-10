@@ -1,29 +1,51 @@
 import isodate
 from routes.occupation import Occupation
 
+MAX_TIME = 24 * 60 * 60
+
 
 class Section(object):
     def __init__(self, data, path):
         self._data = data
         self.path = path
         self.train = path._route.train
+
         self.start_node = None
         self.end_node = None
-        self.is_free = True
-        self.busy_till = 0.0
+
         self.occupations = [Occupation(data=d, section=self) for d in self._data["resource_occupations"]]
+        self.marker = None
+
+        if "section_marker" in self._data:
+            markers = self._data["section_marker"]
+            if len(markers) > 0:
+                self.marker = markers[0]
+
+        self.requirement = None
+        requirements = [r for r in self.train.get_requirements() if r.get_section_marker() == self.get_marker()]
+        if len(requirements) > 0:
+            self.requirement = requirements[0]
+
+        self.id = "%s#%s" % (self.path._route.get_id(), self.get_number())
+        self.minimum_running_time = isodate.parse_duration(self._data["minimum_running_time"]).seconds
 
     def __repr__(self):
-        return "Section(%s) %s" % (self.get_id(), self.get_marker())
+        return "%s" % (self.get_id())
 
     def get_id(self):
-        return "%s#%s" % (self.path._route.get_id(), self.get_number())
+        return self.id
 
     def get_number(self):
         """an ordering number.
         The train passes over the route_sections in this order. This is necessary because the JSON specification does not guarantee that the sequence in the file is preserved when deserializing.
         """
         return self._data["sequence_number"]
+
+    def get_starting_point(self):
+        return self._data["starting_point"]
+
+    def get_ending_point(self):
+        return self._data["ending_point"]
 
     def get_penalty(self):
         """used in the objective function for the timetable.
@@ -51,19 +73,22 @@ class Section(object):
     def get_minimum_running_time(self):
         """minimum time (duration) the train must spend on this route_section
         """
-        return isodate.parse_duration(self._data["minimum_running_time"]).seconds
+        return self.minimum_running_time
 
     def get_occupations(self):
         return self.occupations
+
+    def get_resources(self):
+        resources = []
+        for o in self.get_occupations():
+            resources.append(o.resource)
+        return resources
 
     def get_marker(self):
         """labels that mark this route_section as a potential section to fulfil a section_requirement that has any of these as section_marker.
         Note: In all our problem instances, each route_section has at most one section_marker, i.e. the list has length at most one.
         """
-        if "section_marker" in self._data:
-            markers = self._data["section_marker"]
-            if len(markers) > 0:
-                return markers[0]
+        return self.marker
 
     def get_requirement(self):
         """
@@ -71,8 +96,19 @@ class Section(object):
         :param train:
         :return:
         """
-        requirements = [r for r in self.train.get_requirements() if r.get_section_marker() == self.get_marker()]
-        if len(requirements) == 0:
-            return None
+        return self.requirement
 
-        return requirements[0]
+    def is_free(self):
+        for r in self.get_resources():
+            if not r.is_free_for(train=self.train):
+                return False
+        return True
+
+    def block_by(self):
+        blocking_trains = []
+        for o in self.occupations:
+            r = o.resource
+
+            if r.currently_used_by is not None and r.currently_used_by != self.train:
+                blocking_trains.append(r.currently_used_by)
+        return blocking_trains

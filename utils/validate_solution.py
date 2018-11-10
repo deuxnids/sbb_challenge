@@ -23,7 +23,7 @@ def do_loesung_validation(scenario, solution):
     with open(scenario) as fp:
         scenario_content = json.load(fp)
 
-    scenario_content = translate.translate(scenario_content, translate.translate_to_ger)
+    ##scenario_content = translate.translate(scenario_content, translate.translate_to_ger)
 
     scenario_file = {"verkehrsplan": StringIO(json.dumps(scenario_content))}
     upload_response = requests.post(SCENARIO_UPLOAD_ENDPOINT, files=scenario_file, auth=AUTH)
@@ -41,10 +41,9 @@ def do_loesung_validation(scenario, solution):
     print(f"validation finished with status {validation_response.status_code}")
 
     response = validation_response.json()
-    validation_result = translate.translate(response, translate.translate_to_eng)
-    validation_result = translate.translate_message_word_for_word(validation_result)
-    return validation_result
-
+    #validation_result = translate.translate(response, translate.translate_to_eng)
+    #validation_result = translate.translate_message_word_for_word(validation_result)
+    return response
 
 if __name__ == "__main__":
     validation_result = do_loesung_validation(scenario, solution)

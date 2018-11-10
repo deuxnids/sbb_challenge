@@ -1,10 +1,20 @@
+import numpy as np
+
+
 class Event(object):
     def __init__(self, time, train):
         self.time = time
         self.train = train
+        self.priority = 0
 
     def __str__(self):
-        return humanize_time(self.time) + " %s" % self.train
+        return humanize_time(self.time) + "  -->EVENT %s" % self.train
+
+    def __lt__(self, other):
+        return self.time < other.time
+
+    def __gt__(self, other):
+        return self.time > other.time
 
 
 class EnterNodeEvent(Event):
@@ -28,13 +38,15 @@ class DestinationNodeEvent(Event):
 
 
 class LeaveNodeEvent(Event):
-    def __init__(self, node, previous_section, **kwargs):
+    def __init__(self, node, previous_section, next_section, **kwargs):
         Event.__init__(self, **kwargs)
         self.node = node
+        self.next_section = next_section
         self.previous_section = previous_section
 
     def __str__(self):
-        return super(LeaveNodeEvent, self).__str__() + " leaves %s" % self.node
+        return super(LeaveNodeEvent, self).__str__() + " leaves %s and goes on %s" % (
+            self.previous_section, self.next_section)
 
 
 class EnterStationEvent(Event):
@@ -62,20 +74,22 @@ class WaitingOnSection(Event):
         Event.__init__(self, **kwargs)
 
     def __str__(self):
-        return super(WaitingOnSection, self).__str__() + " waiting"
+        return super(WaitingOnSection, self).__str__() + " has been waiting"
 
 
 class ReleaseResourceEvent(Event):
-    def __init__(self, resource, **kwargs):
+    def __init__(self, resource, emited_at, **kwargs):
         Event.__init__(self, **kwargs)
         self.resource = resource
+        self.emited_at = emited_at
 
     def __str__(self):
         return super(ReleaseResourceEvent, self).__str__() + " release resource %s" % self.resource
 
 
-
 def humanize_time(secs):
+    if np.isinf(secs):
+        return "xxx"
     if secs is None:
         return ""
     mins, secs = divmod(secs, 60)
